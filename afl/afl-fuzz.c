@@ -56,6 +56,8 @@
 #include <sys/ioctl.h>
 #include <sys/file.h>
 
+
+
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 #  include <sys/sysctl.h>
 #endif /* __APPLE__ || __FreeBSD__ || __OpenBSD__ */
@@ -2490,6 +2492,42 @@ static void write_to_testcase(void* mem, u32 len) {
 
 }
 
+// write current input to data
+static void write_to_DATA(void* mem, u32 len, u32 path_hash ) {
+
+  s32 fd;
+  u32 tc_hash=hash32(mem, len, HASH_CONST);
+  u8 * dir;
+  u8 * file;
+  // mkdir 
+  dir = alloc_printf("%s/data/%u", out_dir, path_hash);
+  if ( access(dir,F_OK)==-1 ) {
+    if (mkdir(dir, 0700)) PFATAL("Unable to create '%s'", dir);
+    //save the trace
+    u8 * fname = alloc_printf("%s/data/%u/trace-%u", out_dir,path_hash, path_hash);
+    s32 fd_map = open(fname, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd_map < 0) PFATAL("Unable to open '%s'", fname);
+    ck_write(fd_map, trace_bits, MAP_SIZE, fname);
+    close(fd_map);
+    ck_free(fname);
+  }
+  ck_free(dir);
+
+  //save the file
+  file = alloc_printf("%s/data/%u/%u", out_dir, path_hash, tc_hash);
+  if (access(file,F_OK) !=-1) {
+      ck_free(file);
+      return;
+  }
+
+  fd = open(file, O_WRONLY | O_CREAT | O_EXCL, 0600);
+  if (fd < 0) PFATAL("Unable to create '%s'", file);
+  ck_write(fd, mem, len, file);
+  close(fd);
+  ck_free(file);
+
+}
+
 
 /* The same, but with an adjustable gap. Used for trimming. */
 
@@ -3496,29 +3534,29 @@ static void maybe_update_plot_file(double bitmap_cvg, double eps) {
 
 static u8 delete_files(u8* path, u8* prefix) {
 
-  DIR* d;
-  struct dirent* d_ent;
+    DIR* d;
+    struct dirent* d_ent;
 
-  d = opendir(path);
+    d = opendir(path);
 
-  if (!d) return 0;
+    if (!d) return 0;
 
-  while ((d_ent = readdir(d))) {
+    while ((d_ent = readdir(d))) {
 
-    if (d_ent->d_name[0] != '.' && (!prefix ||
-        !strncmp(d_ent->d_name, prefix, strlen(prefix)))) {
+        if (d_ent->d_name[0] != '.' && (!prefix ||
+                    !strncmp(d_ent->d_name, prefix, strlen(prefix)))) {
 
-      u8* fname = alloc_printf("%s/%s", path, d_ent->d_name);
-      if (unlink(fname)) PFATAL("Unable to delete '%s'", fname);
-      ck_free(fname);
+            u8* fname = alloc_printf("%s/%s", path, d_ent->d_name);
+            if (unlink(fname)) PFATAL("Unable to delete '%s'", fname);
+            ck_free(fname);
+
+        }
 
     }
 
-  }
+    closedir(d);
 
-  closedir(d);
-
-  return !!rmdir(path);
+    return !!rmdir(path);
 
 }
 
@@ -3527,51 +3565,51 @@ static u8 delete_files(u8* path, u8* prefix) {
 
 static double get_runnable_processes(void) {
 
-  static double res;
+    static double res;
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 
-  /* I don't see any portable sysctl or so that would quickly give us the
-     number of runnable processes; the 1-minute load average can be a
-     semi-decent approximation, though. */
+    /* I don't see any portable sysctl or so that would quickly give us the
+       number of runnable processes; the 1-minute load average can be a
+       semi-decent approximation, though. */
 
-  if (getloadavg(&res, 1) != 1) return 0;
+    if (getloadavg(&res, 1) != 1) return 0;
 
 #else
 
-  /* On Linux, /proc/stat is probably the best way; load averages are
-     computed in funny ways and sometimes don't reflect extremely short-lived
-     processes well. */
+    /* On Linux, /proc/stat is probably the best way; load averages are
+       computed in funny ways and sometimes don't reflect extremely short-lived
+       processes well. */
 
-  FILE* f = fopen("/proc/stat", "r");
-  u8 tmp[1024];
-  u32 val = 0;
+    FILE* f = fopen("/proc/stat", "r");
+    u8 tmp[1024];
+    u32 val = 0;
 
-  if (!f) return 0;
+    if (!f) return 0;
 
-  while (fgets(tmp, sizeof(tmp), f)) {
+    while (fgets(tmp, sizeof(tmp), f)) {
 
-    if (!strncmp(tmp, "procs_running ", 14) ||
-        !strncmp(tmp, "procs_blocked ", 14)) val += atoi(tmp + 14);
+        if (!strncmp(tmp, "procs_running ", 14) ||
+                !strncmp(tmp, "procs_blocked ", 14)) val += atoi(tmp + 14);
 
-  }
- 
-  fclose(f);
+    }
 
-  if (!res) {
+    fclose(f);
 
-    res = val;
+    if (!res) {
 
-  } else {
+        res = val;
 
-    res = res * (1.0 - 1.0 / AVG_SMOOTHING) +
-          ((double)val) * (1.0 / AVG_SMOOTHING);
+    } else {
 
-  }
+        res = res * (1.0 - 1.0 / AVG_SMOOTHING) +
+            ((double)val) * (1.0 / AVG_SMOOTHING);
+
+    }
 
 #endif /* ^(__APPLE__ || __FreeBSD__ || __OpenBSD__) */
 
-  return res;
+    return res;
 
 }
 
@@ -3580,37 +3618,37 @@ static double get_runnable_processes(void) {
 
 static void nuke_resume_dir(void) {
 
-  u8* fn;
+    u8* fn;
 
-  fn = alloc_printf("%s/_resume/.state/deterministic_done", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
+    fn = alloc_printf("%s/_resume/.state/deterministic_done", out_dir);
+    if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+    ck_free(fn);
 
-  fn = alloc_printf("%s/_resume/.state/auto_extras", out_dir);
-  if (delete_files(fn, "auto_")) goto dir_cleanup_failed;
-  ck_free(fn);
+    fn = alloc_printf("%s/_resume/.state/auto_extras", out_dir);
+    if (delete_files(fn, "auto_")) goto dir_cleanup_failed;
+    ck_free(fn);
 
-  fn = alloc_printf("%s/_resume/.state/redundant_edges", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
+    fn = alloc_printf("%s/_resume/.state/redundant_edges", out_dir);
+    if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+    ck_free(fn);
 
-  fn = alloc_printf("%s/_resume/.state/variable_behavior", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
+    fn = alloc_printf("%s/_resume/.state/variable_behavior", out_dir);
+    if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+    ck_free(fn);
 
-  fn = alloc_printf("%s/_resume/.state", out_dir);
-  if (rmdir(fn) && errno != ENOENT) goto dir_cleanup_failed;
-  ck_free(fn);
+    fn = alloc_printf("%s/_resume/.state", out_dir);
+    if (rmdir(fn) && errno != ENOENT) goto dir_cleanup_failed;
+    ck_free(fn);
 
-  fn = alloc_printf("%s/_resume", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
+    fn = alloc_printf("%s/_resume", out_dir);
+    if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+    ck_free(fn);
 
-  return;
+    return;
 
 dir_cleanup_failed:
 
-  FATAL("_resume directory cleanup failed");
+    FATAL("_resume directory cleanup failed");
 
 }
 
@@ -3620,133 +3658,133 @@ dir_cleanup_failed:
 
 static void maybe_delete_out_dir(void) {
 
-  FILE* f;
-  u8 *fn = alloc_printf("%s/fuzzer_stats", out_dir);
+    FILE* f;
+    u8 *fn = alloc_printf("%s/fuzzer_stats", out_dir);
 
-  /* See if the output directory is locked. If yes, bail out. If not,
-     create a lock that will persist for the lifetime of the process
-     (this requires leaving the descriptor open).*/
+    /* See if the output directory is locked. If yes, bail out. If not,
+       create a lock that will persist for the lifetime of the process
+       (this requires leaving the descriptor open).*/
 
-  out_dir_fd = open(out_dir, O_RDONLY);
-  if (out_dir_fd < 0) PFATAL("Unable to open '%s'", out_dir);
+    out_dir_fd = open(out_dir, O_RDONLY);
+    if (out_dir_fd < 0) PFATAL("Unable to open '%s'", out_dir);
 
 #ifndef __sun
 
-  if (flock(out_dir_fd, LOCK_EX | LOCK_NB) && errno == EWOULDBLOCK) {
+    if (flock(out_dir_fd, LOCK_EX | LOCK_NB) && errno == EWOULDBLOCK) {
 
-    SAYF("\n" cLRD "[-] " cRST
-         "Looks like the job output directory is being actively used by another\n"
-         "    instance of afl-fuzz. You will need to choose a different %s\n"
-         "    or stop the other process first.\n",
-         sync_id ? "fuzzer ID" : "output location");
+        SAYF("\n" cLRD "[-] " cRST
+                "Looks like the job output directory is being actively used by another\n"
+                "    instance of afl-fuzz. You will need to choose a different %s\n"
+                "    or stop the other process first.\n",
+                sync_id ? "fuzzer ID" : "output location");
 
-    FATAL("Directory '%s' is in use", out_dir);
-
-  }
-
-#endif /* !__sun */
-
-  f = fopen(fn, "r");
-
-  if (f) {
-
-    u64 start_time, last_update;
-
-    if (fscanf(f, "start_time     : %llu\n"
-                  "last_update    : %llu\n", &start_time, &last_update) != 2)
-      FATAL("Malformed data in '%s'", fn);
-
-    fclose(f);
-
-    /* Let's see how much work is at stake. */
-
-    if (!in_place_resume && last_update - start_time > OUTPUT_GRACE * 60) {
-
-      SAYF("\n" cLRD "[-] " cRST
-           "The job output directory already exists and contains the results of more\n"
-           "    than %u minutes worth of fuzzing. To avoid data loss, afl-fuzz will *NOT*\n"
-           "    automatically delete this data for you.\n\n"
-
-           "    If you wish to start a new session, remove or rename the directory manually,\n"
-           "    or specify a different output location for this job. To resume the old\n"
-           "    session, put '-' as the input directory in the command line ('-i -') and\n"
-           "    try again.\n", OUTPUT_GRACE);
-
-       FATAL("At-risk data found in '%s'", out_dir);
+        FATAL("Directory '%s' is in use", out_dir);
 
     }
 
-  }
+#endif /* !__sun */
 
-  ck_free(fn);
+    f = fopen(fn, "r");
 
-  /* The idea for in-place resume is pretty simple: we temporarily move the old
-     queue/ to a new location that gets deleted once import to the new queue/
-     is finished. If _resume/ already exists, the current queue/ may be
-     incomplete due to an earlier abort, so we want to use the old _resume/
-     dir instead, and we let rename() fail silently. */
+    if (f) {
 
-  if (in_place_resume) {
+        u64 start_time, last_update;
 
-    u8* orig_q = alloc_printf("%s/queue", out_dir);
+        if (fscanf(f, "start_time     : %llu\n"
+                    "last_update    : %llu\n", &start_time, &last_update) != 2)
+            FATAL("Malformed data in '%s'", fn);
 
-    in_dir = alloc_printf("%s/_resume", out_dir);
+        fclose(f);
 
-    rename(orig_q, in_dir); /* Ignore errors */
+        /* Let's see how much work is at stake. */
 
-    OKF("Output directory exists, will attempt session resume.");
+        if (!in_place_resume && last_update - start_time > OUTPUT_GRACE * 60) {
 
-    ck_free(orig_q);
+            SAYF("\n" cLRD "[-] " cRST
+                    "The job output directory already exists and contains the results of more\n"
+                    "    than %u minutes worth of fuzzing. To avoid data loss, afl-fuzz will *NOT*\n"
+                    "    automatically delete this data for you.\n\n"
 
-  } else {
+                    "    If you wish to start a new session, remove or rename the directory manually,\n"
+                    "    or specify a different output location for this job. To resume the old\n"
+                    "    session, put '-' as the input directory in the command line ('-i -') and\n"
+                    "    try again.\n", OUTPUT_GRACE);
 
-    OKF("Output directory exists but deemed OK to reuse.");
+            FATAL("At-risk data found in '%s'", out_dir);
 
-  }
+        }
 
-  ACTF("Deleting old session data...");
+    }
 
-  /* Okay, let's get the ball rolling! First, we need to get rid of the entries
-     in <out_dir>/.synced/.../id:*, if any are present. */
-
-  if (!in_place_resume) {
-
-    fn = alloc_printf("%s/.synced", out_dir);
-    if (delete_files(fn, NULL)) goto dir_cleanup_failed;
     ck_free(fn);
 
-  }
+    /* The idea for in-place resume is pretty simple: we temporarily move the old
+       queue/ to a new location that gets deleted once import to the new queue/
+       is finished. If _resume/ already exists, the current queue/ may be
+       incomplete due to an earlier abort, so we want to use the old _resume/
+       dir instead, and we let rename() fail silently. */
 
-  /* Next, we need to clean up <out_dir>/queue/.state/ subdirectories: */
+    if (in_place_resume) {
 
-  fn = alloc_printf("%s/queue/.state/deterministic_done", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
+        u8* orig_q = alloc_printf("%s/queue", out_dir);
 
-  fn = alloc_printf("%s/queue/.state/auto_extras", out_dir);
-  if (delete_files(fn, "auto_")) goto dir_cleanup_failed;
-  ck_free(fn);
+        in_dir = alloc_printf("%s/_resume", out_dir);
 
-  fn = alloc_printf("%s/queue/.state/redundant_edges", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
+        rename(orig_q, in_dir); /* Ignore errors */
 
-  fn = alloc_printf("%s/queue/.state/variable_behavior", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
+        OKF("Output directory exists, will attempt session resume.");
 
-  /* Then, get rid of the .state subdirectory itself (should be empty by now)
-     and everything matching <out_dir>/queue/id:*. */
+        ck_free(orig_q);
 
-  fn = alloc_printf("%s/queue/.state", out_dir);
-  if (rmdir(fn) && errno != ENOENT) goto dir_cleanup_failed;
-  ck_free(fn);
+    } else {
 
-  fn = alloc_printf("%s/queue", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
+        OKF("Output directory exists but deemed OK to reuse.");
 
-  /* All right, let's do <out_dir>/crashes/id:* and <out_dir>/hangs/id:*. */
+    }
+
+    ACTF("Deleting old session data...");
+
+    /* Okay, let's get the ball rolling! First, we need to get rid of the entries
+       in <out_dir>/.synced/.../id:*, if any are present. */
+
+    if (!in_place_resume) {
+
+        fn = alloc_printf("%s/.synced", out_dir);
+        if (delete_files(fn, NULL)) goto dir_cleanup_failed;
+        ck_free(fn);
+
+    }
+
+    /* Next, we need to clean up <out_dir>/queue/.state/ subdirectories: */
+
+    fn = alloc_printf("%s/queue/.state/deterministic_done", out_dir);
+    if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+    ck_free(fn);
+
+    fn = alloc_printf("%s/queue/.state/auto_extras", out_dir);
+    if (delete_files(fn, "auto_")) goto dir_cleanup_failed;
+    ck_free(fn);
+
+    fn = alloc_printf("%s/queue/.state/redundant_edges", out_dir);
+    if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+    ck_free(fn);
+
+    fn = alloc_printf("%s/queue/.state/variable_behavior", out_dir);
+    if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+    ck_free(fn);
+
+    /* Then, get rid of the .state subdirectory itself (should be empty by now)
+       and everything matching <out_dir>/queue/id:*. */
+
+    fn = alloc_printf("%s/queue/.state", out_dir);
+    if (rmdir(fn) && errno != ENOENT) goto dir_cleanup_failed;
+    ck_free(fn);
+
+    fn = alloc_printf("%s/queue", out_dir);
+    if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+    ck_free(fn);
+
+    /* All right, let's do <out_dir>/crashes/id:* and <out_dir>/hangs/id:*. */
 
   if (!in_place_resume) {
 
@@ -3838,6 +3876,12 @@ static void maybe_delete_out_dir(void) {
   fn = alloc_printf("%s/plot_data", out_dir);
   if (unlink(fn) && errno != ENOENT) goto dir_cleanup_failed;
   ck_free(fn);
+
+  // delete the data
+  fn = alloc_printf("%s/data", out_dir);
+  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
+  ck_free(fn);
+
 
   OKF("Output dir cleanup successful.");
 
@@ -4598,6 +4642,10 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   write_to_testcase(out_buf, len);
 
   fault = run_target(argv, exec_tmout);
+
+  //save the data
+  write_to_DATA(out_buf,len, hash32(trace_bits, MAP_SIZE, HASH_CONST));
+
 
   if (stop_soon) return 1;
 
@@ -7197,6 +7245,11 @@ EXP_ST void setup_dirs_fds(void) {
                      "unique_hangs, max_depth, execs_per_sec\n");
                      /* ignore errors */
 
+  // mkdir the data dir
+  tmp = alloc_printf("%s/data", out_dir);
+  if (mkdir(tmp, 0700)) PFATAL("Unable to create '%s'", tmp);
+  ck_free(tmp);
+
 }
 
 
@@ -7994,8 +8047,8 @@ int main(int argc, char** argv) {
   /* Woop woop woop */
 
   if (!not_on_tty) {
-    sleep(4);
-    start_time += 4000;
+    sleep(0.1);
+    start_time += 100;
     if (stop_soon) goto stop_fuzzing;
   }
 
