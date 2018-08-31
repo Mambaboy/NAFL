@@ -2495,7 +2495,7 @@ static void write_to_testcase(void* mem, u32 len) {
 
 u32 filecnt(u8* filename)
 {
-    static u32 cnt = 0;
+    u32 cnt = 0;
     DIR* dir = opendir(filename);
     if(dir == NULL)
     {
@@ -2536,12 +2536,15 @@ static void write_to_DATA(void* mem, u32 len, u32 path_hash ) {
     close(fd_map);
     ck_free(fname);
   }
-  ck_free(dir);
 
   // get the number of the file
-  if ( filecnt(dir) > 30 )
+  u32 file_num=filecnt(dir);
+  ck_free(dir);
+  
+  if ( file_num > 30 )
       return;
 
+  
   //save the file
   file = alloc_printf("%s/data/%u/%u", out_dir, path_hash, tc_hash);
   if (access(file,F_OK) !=-1) {
