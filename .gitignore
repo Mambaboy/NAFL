@@ -1,2 +1,4 @@
 afl/qemu_mode/qemu-2.10.0.tar.xz
 afl/qemu_mode/qemu-2.10.0/
+cnn-learn/model.h5
+cnn-learn/model.png
