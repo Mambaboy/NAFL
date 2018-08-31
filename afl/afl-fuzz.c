@@ -2492,6 +2492,30 @@ static void write_to_testcase(void* mem, u32 len) {
 
 }
 
+
+u32 filecnt(u8* filename)
+{
+    static u32 cnt = 0;
+    DIR* dir = opendir(filename);
+    if(dir == NULL)
+    {
+        return 0;
+    }
+    struct dirent* read = NULL;
+    while( (read = readdir(dir))!= NULL)
+    {
+        if((read->d_name)[0] == '.')
+            continue;
+        //struct stat st;
+        //u32 res;
+        //res = stat(read->d_name,&st);
+        //不会有其他目录 
+        cnt++;
+    }
+    closedir(dir);
+    return cnt;
+}
+
 // write current input to data
 static void write_to_DATA(void* mem, u32 len, u32 path_hash ) {
 
@@ -2499,6 +2523,7 @@ static void write_to_DATA(void* mem, u32 len, u32 path_hash ) {
   u32 tc_hash=hash32(mem, len, HASH_CONST);
   u8 * dir;
   u8 * file;
+  
   // mkdir 
   dir = alloc_printf("%s/data/%u", out_dir, path_hash);
   if ( access(dir,F_OK)==-1 ) {
@@ -2512,6 +2537,10 @@ static void write_to_DATA(void* mem, u32 len, u32 path_hash ) {
     ck_free(fname);
   }
   ck_free(dir);
+
+  // get the number of the file
+  if ( filecnt(dir) > 30 )
+      return;
 
   //save the file
   file = alloc_printf("%s/data/%u/%u", out_dir, path_hash, tc_hash);
