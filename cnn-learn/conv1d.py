@@ -34,14 +34,14 @@ model.compile(loss='binary_crossentropy',
 print(model.summary())
 
 #exit(0)
-model.fit(x_train, y_train, batch_size=16, epochs=10)
+model.fit(x_train, y_train, batch_size=16, epochs=50)
 #score = model.evaluate(x_test, y_test, batch_size=16)
 
 model.save("./model.h5")
 plot_model(model, to_file='model.png')
 
 # 预测某个输入的输出
-print(data_1d.shape)
-output = keras.Model(inputs=model.input, outputs=model.get_layer('full_connect_layer').output).predict(data_1d)
+#print(data_1d.shape)
+#output = keras.Model(inputs=model.input, outputs=model.get_layer('full_connect_layer').output).predict(data_1d)
 
 
