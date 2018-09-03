@@ -1,4 +1,3 @@
-#coding=utf-8
 import os
 import shutil
 import numpy as np
@@ -7,24 +6,22 @@ import logging
 import coloredlogs
 
 l=logging.getLogger("NEUZZ")
-l.setLevel("INFO") #记录器的级别
+l.setLevel("INFO") 
 fmt = "%(asctime)-15s %(filename)s:%(lineno)d %(process)d %(levelname)s %(message)s"
 
-#创建屏幕handler
-sh = logging.StreamHandler()#往屏幕上输出
+#scree handler
+sh = logging.StreamHandler()# output to scree
 #create formatter
 formatter = logging.Formatter(fmt)
 # add handler and formatter to logger
 sh.setFormatter(formatter)
 l.addHandler(sh)
 
-#屏幕输出由coloredlogs指定
+#install the coloredlogs
 coloredlogs.install(fmt=fmt,logger=l)
 
 
-# 目前是一次性的
 
-#总类
 class Collect():
     def __init__(self, afl_work_dir, binary_path):
         self.afl_work_dir   = afl_work_dir
@@ -43,16 +40,18 @@ class Collect():
             self.paths.append(path)  # store the path object 
     
     def get_total_samples(self):
-        
         for path in self.paths:
             self.path_dict.update( {path.bitmap_hash : path.inputs_num } )
             self.total_samples += path.inputs_num
-
         return self.total_samples
 
 
+    def read_all_samples(sefl):
+        for path in self.paths:
+            path.read_path_samples()
 
-#每个路径搞一个类, 记录数据的路径，暂时不进行io
+
+
 class Path():
     def __init__(self, bitmap_hash, data_dir):
         self.bitmap_hash  = bitmap_hash;
@@ -69,14 +68,20 @@ class Path():
             input_path = os.path.join(self.data_dir, item)
             self.inputs_path.add(input_path)
 
+    def read_path_samples(self):
+        for input in self.inputs_path:
+            a = open(input, "rb")
 
 
 
 def main():
     afl_work_dir = "/home/binzhang/NAFL/output-afl"
     binary_path = "/home/binzhang/NAFL/benchmark/size"
-    Collect1 = Collect(afl_work_dir, binary_path)
-    Collect1.collect_by_path()
+    collect = Collect(afl_work_dir, binary_path)
+    collect.collect_by_path()
+    collect.read_all_samples()
+
+
     l.info("have some %d sample",Collect1.get_total_samples())
 
 if __name__ == "__main__":
