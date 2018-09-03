@@ -4,6 +4,7 @@ import numpy as np
 
 import logging
 import coloredlogs
+import time
 
 l=logging.getLogger("NEUZZ")
 l.setLevel("INFO") 
@@ -38,17 +39,21 @@ class Collect():
             sole_data_dir = os.path.join(self.all_data_dir, path_hash)
             path = Path(path_hash, sole_data_dir)
             self.paths.append(path)  # store the path object 
+        #count the total 
+        self.get_total_samples()
     
     def get_total_samples(self):
         for path in self.paths:
             self.path_dict.update( {path.bitmap_hash : path.inputs_num } )
             self.total_samples += path.inputs_num
+        l.info("have some %d sample", self.total_samples)
         return self.total_samples
 
-
-    def read_all_samples(sefl):
+    def read_all_samples(self):
+        read_num=0
         for path in self.paths:
-            path.read_path_samples()
+            read_num += path.read_path_samples()
+        l.info("read %s sample",read_num)
 
 
 
@@ -71,18 +76,18 @@ class Path():
     def read_path_samples(self):
         for input in self.inputs_path:
             a = open(input, "rb")
-
+        return self.inputs_num
 
 
 def main():
     afl_work_dir = "/home/binzhang/NAFL/output-afl"
     binary_path = "/home/binzhang/NAFL/benchmark/size"
     collect = Collect(afl_work_dir, binary_path)
+    
     collect.collect_by_path()
     collect.read_all_samples()
 
 
-    l.info("have some %d sample",Collect1.get_total_samples())
 
 if __name__ == "__main__":
     main()
