@@ -102,12 +102,6 @@ class Collect():
         content = f.read()
         f.close()
 
-#        # control the length
-#        if len(content) >= self.input_max_len:
-#            content = content[0:self.input_max_len]
-#        else:
-#            content = content + b'\x00'*( self.input_max_len - len(content)) 
-#
         # transform
         content = struct.unpack('b'*len(content), content) ## it is a tuple
         content = np.array(content).reshape( len(content), 1 )
@@ -115,25 +109,27 @@ class Collect():
         return content
 
 
-
-
     def read_samples_by_size(self, size=10):
         inputs_data = np.ones( (self.input_max_len ,1) )
-        labels_data = np.ones( (65536 ,1) )
+        lables_data = np.ones( (65536 ,1) )
         
         for i in xrange(size):
             input_path = self.inputs_with_lable[i][0]
             bitmap_path = self.inputs_with_lable[i][1]
    
             input_content = self.read_input_content(input_path)
-            inputs_data = np.insert(inputs_data, [0],input_content, axis=1) 
+            inputs_data = np.append(inputs_data, input_content, axis=1) 
 
             bitmap_content = self.read_bitmap_content(bitmap_path)
-            labels_data = np.insert(labels_data, [0], bitmap_content, axis=1)
+            lables_data = np.append(lables_data, bitmap_content, axis=1)
+
+        inputs_data = np.delete(inputs_data, 0, axis=1)
+        lables_data = np.delete(lables_data, 0, axis=1)
+        
         print(type(inputs_data.shape))
         l.info(inputs_data.shape)
-        l.info(labels_data.shape)
-        return inputs_data, labels_data
+        l.info(lables_data.shape)
+        return inputs_data, lables_data
              
     def read_path_samples(self):
         for input in self.input_paths:
