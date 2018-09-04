@@ -2492,7 +2492,6 @@ static void write_to_testcase(void* mem, u32 len) {
 
 }
 
-
 u32 filecnt(u8* filename)
 {
     u32 cnt = 0;
