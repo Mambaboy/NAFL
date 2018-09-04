@@ -63,7 +63,8 @@ class Path():
         self.data_dir     = data_dir 
         
         self.bitmap_path  = os.path.join(data_dir, "trace-%s"%(bitmap_hash) )
-        
+        self.bitmap       =  None 
+
         self.inputs_path=set() #save all the inputs  absolute path
         self._get_inputs_path()
         self.inputs_num   = len(self.inputs_path)
@@ -77,6 +78,10 @@ class Path():
         for input in self.inputs_path:
             a = open(input, "rb")
         return self.inputs_num
+
+    def read_path_bitmap(self):
+        self.bitmap = open(self.binary_path, "rb")
+
 
 
 def main():
