@@ -59,6 +59,7 @@ class Collect():
             # collect all input path
             input_paths = path.get_input_paths()
             bitmap_path = path.get_bitmap_path()
+
             for sole_input in input_paths:
                 self.inputs_with_label.append( (sole_input, bitmap_path) )
 
@@ -66,6 +67,7 @@ class Collect():
             self.path_num_dict.update({path_hash:path.inputs_num})
 
         # shuffle the list
+        l.info("shuffle the inputs")
         random.shuffle(self.inputs_with_label)
 
         self.save_to_json()

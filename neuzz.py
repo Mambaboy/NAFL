@@ -22,9 +22,9 @@ coloredlogs.install(fmt=fmt)
 #for model
 input_size  = 400
 output_size = 65536
-strides = 3
+strides = 9
 epochs = 1
-batch_size = 200
+batch_size = 20
 
 #for collect
 ignore_ts = 29
@@ -51,14 +51,25 @@ class Nmodel():
         self.labels_test  = None
 
     def create_model(self):
-        self.model.add(Conv1D(64, 9, activation='relu', strides= self.strides,  padding="same", input_shape=( self.input_size,1)))
-        self.model.add(Conv1D(64, 9, activation='relu', strides= self.strides,  padding="same"))
-        self.model.add(Conv1D(64, 9, activation='relu', strides= self.strides,  padding="same"))
+        self.model.add(Conv1D(64, 9, strides= self.strides,  padding="same", input_shape=( self.input_size,1)))
+        self.model.add( Activation("relu",name="relu1" ))
+       
+        self.model.add(Conv1D(64*2, 9, strides= self.strides,  padding="same"))
+        self.model.add( Activation("relu",name="relu2" ))
+
+        self.model.add(Conv1D(64*2*2, 9, activation='relu', strides= self.strides,  padding="same"))
+        self.model.add( Activation("relu",name="relu3" ))
+
         self.model.add(Dropout(0.25))
+
         self.model.add(Flatten())
-        self.model.add(Dense( self.output_size, name="full_connect_layer"))
-        self.model.add(Dropout(0.25))
-        self.model.add(Activation("sigmoid"))
+        self.model.add(Dense(self.output_size *1, activation='relu', name="full_connect_layer1" ))
+        
+        #self.model.add(Dropout(0.25))
+        
+        #self.model.add(Dense( self.output_size, name="full_connect_layer2"))
+
+        self.model.add(Activation("sigmoid",name="sigmoid" ))
 
         self.model.compile(loss='binary_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
 
@@ -79,24 +90,16 @@ class Nmodel():
         
     def train_model(self):
         #self.model.fit(self.inputs_train, self.labels_train, batch_size=16, epochs=self.epochs)
-        #score = self.model.evaluate(x_test, y_test, batch_size=16)
         
         self.model.fit_generator( self.generator_data_by_batch(), steps_per_epoch=self.sample_size/self.batch_size,
                                   epochs = self.epochs, verbose =1 )
-
+    def evaluate_model(self):
+        score = self.model.evaluate(x_test, y_test, batch_size=self.batch_size)
     
     def set_all_data(self, inputs_with_label):
         self.inputs_with_label = inputs_with_label
         self.total_sample_number = len(self.inputs_with_label)
 
-    #def set_train_data(self, inputs_train, labels_train):
-    #    self.inputs_train = inputs_train 
-    #    self.labels_train = labels_train
-
-    #def set_test_data(self, inputs_test, labels_test):
-    #    self.inputs_test = inputs_test
-    #    self.labels_test = labels_test
-    
     def _read_input_content(self, file):
         f = open(file, "rb")
         content = f.read()
@@ -106,12 +109,12 @@ class Nmodel():
         if len(content) >= self.input_size:
             content = content[0:self.input_size]
         else:
-            content = content + b'\x00'*( self.input_size - len(content)) 
+            content = content + b'\x00'*( self.input_size - len(content)) # the value is -128  to 127 , using b not B 
 
         # transform
         content = struct.unpack('b'*len(content), content) ## it is a tuple
-        content = np.array(content)
-
+        content = np.array(content).astype(np.float64)/255
+        
         return content
 
     def _read_bitmap_content(self, file):
@@ -122,6 +125,14 @@ class Nmodel():
         # transform
         content = struct.unpack('b'*len(content), content) ## it is a tuple
         content = np.array(content)
+        
+        # normalization
+        content = content.astype(np.bool).astype(np.int8)
+
+        #for i in xrange(len(content)-1):
+        #    if content[i]!=0:
+        #        l.info(content[i])
+        #        l.info(i)
 
         return content
 
@@ -163,24 +174,11 @@ class Nmodel():
         start_index = 0
         
         while True:
-            inputs_data, labels_data = self.read_samples_by_size( size = self.batch_size, start_index =start_index )
+            inputs_data, labels_data = self.read_samples_by_size( size = self.batch_size, start_index = start_index )
             start_index += batch_size
             yield (inputs_data, labels_data)
 
 
-
-
-#def try_test():
-#    nmodel = Nmodel( input_size, output_size, sample_size, strides=3, epochs=10)
-#    nmodel.create_model()
-#    
-#    x_train = np.random.randint( 2, size=(sample_size,input_size,1) )
-#    y_train = np.random.randint( 2, size=(sample_size, output_size) )
-#
-#    nmodel.set_train_data( x_train, y_train )
-#
-#    nmodel.train_model()
-#    nmodel.save_mode()
 
 
 def test_part_data(  ):
@@ -194,24 +192,23 @@ def test_part_data(  ):
     #1. collect the path of each input
     collect.collect_by_path()
     sample_size = collect.get_total_samples() 
-    sample_size = 10000 
+    sample_size =  sample_size/2 
     #2.init the model
     nmodel = Nmodel( input_size = input_size, output_size = output_size, sample_size = sample_size, 
                     strides = strides, epochs = epochs, batch_size = batch_size  )
 
     nmodel.create_model()
     
-    #nmodel.get_model_net()
+    nmodel.get_model_net()
+    #exit(0)    
     
     #2. read the content of each input
     inputs_with_label = collect.get_data()
     nmodel.set_all_data( inputs_with_label)
 
-
     # for test
     nmodel.read_samples_by_size(1)
-
-
+    exit(0)
     # train the model
     nmodel.train_model()
 
@@ -221,8 +218,6 @@ def test_part_data(  ):
 
 def main():
     test_part_data(  )
-    #try_test()    
-    #data_1d = np.random.randint( 2, size=(1,input_length,1) )
 
 if __name__ == "__main__":
     main()
