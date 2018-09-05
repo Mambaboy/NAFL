@@ -70,8 +70,7 @@ class Collect():
 
         self.save_to_json()
 
-        l.info("collect all inputs paths with their bitmap OK!")
-   
+        l.info("collect %d inputs with their bitmap!", len(self.inputs_with_label) )
 
     def get_total_samples(self):
         l.info("there are %s samples", len(self.inputs_with_label))

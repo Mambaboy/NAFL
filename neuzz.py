@@ -19,17 +19,29 @@ fmt = "%(asctime)-15s %(filename)s:%(lineno)d %(process)d %(levelname)s %(messag
 #install the coloredlogs
 coloredlogs.install(fmt=fmt)
 
+#for model
+input_size  = 400
+output_size = 65536
+strides = 3
+epochs = 1
+batch_size = 200
+
+#for collect
+ignore_ts = 29
+from_file = True
+
 
 class Nmodel():
-    def __init__(self, input_size, output_size, sample_size, strides=1, epochs=50):
+    def __init__(self, input_size, output_size, sample_size, strides=1, batch_size=200, epochs=50):
         self.input_size  =  input_size 
         self.output_size = output_size 
         self.sample_size =  sample_size 
         self.strides     = strides 
         self.epochs      = epochs
-
+        self.batch_size  = batch_size
 
         self.inputs_with_label = None
+        self.total_sample_number = 0
 
         self.model       = Sequential()
 
@@ -61,7 +73,7 @@ class Nmodel():
         # output = keras.Model(inputs=model.input, outputs=model.get_layer('full_connect_layer').output).predict(data_1d)
         pass
     
-    def save_mode(self):
+    def save_model(self):
         self.model.save("./model.h5")
         plot_model(self.model, to_file='model.png')
         
@@ -69,20 +81,21 @@ class Nmodel():
         #self.model.fit(self.inputs_train, self.labels_train, batch_size=16, epochs=self.epochs)
         #score = self.model.evaluate(x_test, y_test, batch_size=16)
         
-        self.model.fit_generator( self.generator_data_by_batch(), steps_per_epoch=1000/100, epochs=50 )
+        self.model.fit_generator( self.generator_data_by_batch(), steps_per_epoch=self.sample_size/self.batch_size,
+                                  epochs = self.epochs, verbose =1 )
 
-
-
+    
     def set_all_data(self, inputs_with_label):
         self.inputs_with_label = inputs_with_label
+        self.total_sample_number = len(self.inputs_with_label)
 
-    def set_train_data(self, inputs_train, labels_train):
-        self.inputs_train = inputs_train 
-        self.labels_train = labels_train
+    #def set_train_data(self, inputs_train, labels_train):
+    #    self.inputs_train = inputs_train 
+    #    self.labels_train = labels_train
 
-    def set_test_data(self, inputs_test, labels_test):
-        self.inputs_test = inputs_test
-        self.labels_test = labels_test
+    #def set_test_data(self, inputs_test, labels_test):
+    #    self.inputs_test = inputs_test
+    #    self.labels_test = labels_test
     
     def _read_input_content(self, file):
         f = open(file, "rb")
@@ -148,62 +161,66 @@ class Nmodel():
         it is the generator for the fit_generator function
         '''
         start_index = 0
-        batch_size =100
+        
         while True:
-            inputs_data, labels_data = self.read_samples_by_size(size = batch_size, start_index =start_index)
+            inputs_data, labels_data = self.read_samples_by_size( size = self.batch_size, start_index =start_index )
             start_index += batch_size
             yield (inputs_data, labels_data)
 
 
 
 
-def try_test():
-    nmodel = Nmodel( input_size, output_size, sample_size, strides=3, epochs=10)
-    nmodel.create_model()
-    
-    x_train = np.random.randint( 2, size=(sample_size,input_size,1) )
-    y_train = np.random.randint( 2, size=(sample_size, output_size) )
+#def try_test():
+#    nmodel = Nmodel( input_size, output_size, sample_size, strides=3, epochs=10)
+#    nmodel.create_model()
+#    
+#    x_train = np.random.randint( 2, size=(sample_size,input_size,1) )
+#    y_train = np.random.randint( 2, size=(sample_size, output_size) )
+#
+#    nmodel.set_train_data( x_train, y_train )
+#
+#    nmodel.train_model()
+#    nmodel.save_mode()
 
-    nmodel.set_train_data( x_train, y_train )
 
-    nmodel.train_model()
-    nmodel.save_mode()
-
-def test_part_data(input_size, output_size, sample_size ):
+def test_part_data(  ):
     afl_work_dir = "/home/binzhang/NAFL/output-afl"
     binary_path = "/home/binzhang/NAFL/benchmark/size"
-    collect = Collect( afl_work_dir, binary_path, ignore_ts = 30, input_fix_len = 300)
+    
+    # init the collect 
+    collect = Collect( afl_work_dir =afl_work_dir, binary_path = binary_path, ignore_ts =ignore_ts, 
+                        input_fix_len = input_size, from_file= from_file)
     
     #1. collect the path of each input
     collect.collect_by_path()
-    collect.get_total_samples() 
-    
-    #2. read the content of each input, and deal with the length 
-    inputs_with_label = collect.get_data()
-   
-    # 3.init the model
-    
-    nmodel = Nmodel( input_size, output_size, sample_size, strides=3, epochs=10)
+    sample_size = collect.get_total_samples() 
+    sample_size = 10000 
+    #2.init the model
+    nmodel = Nmodel( input_size = input_size, output_size = output_size, sample_size = sample_size, 
+                    strides = strides, epochs = epochs, batch_size = batch_size  )
+
     nmodel.create_model()
     
-    nmodel.get_model_net()
-
+    #nmodel.get_model_net()
+    
+    #2. read the content of each input
+    inputs_with_label = collect.get_data()
     nmodel.set_all_data( inputs_with_label)
 
-    #nmodel.read_samples_by_size(100)
+
+    # for test
+    nmodel.read_samples_by_size(1)
+
+
     # train the model
-    #nmodel.train_model()
+    nmodel.train_model()
 
     # save the model
-    #nmodel.save_model()
+    nmodel.save_model()
 
 
 def main():
-    input_size  = 300
-    output_size = 65536
-    sample_size = 100
-
-    test_part_data( input_size, output_size, sample_size )
+    test_part_data(  )
     #try_test()    
     #data_1d = np.random.randint( 2, size=(1,input_length,1) )
 
