@@ -5,3 +5,7 @@ cnn-learn/model.png
 output-afl
 output-fair/
 traceback*
+data.json
+*.pyc
+*.h5
+*.png
