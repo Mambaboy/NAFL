@@ -9,3 +9,5 @@ data.json
 *.pyc
 *.h5
 *.png
+output-afl.tar.gz
+output-fair.tar.gz

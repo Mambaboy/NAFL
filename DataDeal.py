@@ -14,6 +14,8 @@ l=logging.getLogger("NEUZZ")
 l.setLevel("INFO") 
 fmt = "%(asctime)-15s %(filename)s:%(lineno)d %(process)d %(levelname)s %(message)s"
 
+cur_dir = os.path.abspath(os.path.dirname(__file__))
+
 #install the coloredlogs
 coloredlogs.install(fmt=fmt)
 
@@ -136,8 +138,9 @@ class Path():
 
 
 def main():
-    afl_work_dir = "/home/binzhang/NAFL/output-afl"
-    binary_path = "/home/binzhang/NAFL/benchmark/size"
+    afl_work_dir = os.path.join(cur_dir," output-afl")
+    binary_path =  os.path.join(cur_dir, "benchmark/size")
+    
     collect = Collect(afl_work_dir, binary_path, ignore_ts=30)
     
     #1. collect the path of each input
