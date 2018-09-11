@@ -6,7 +6,7 @@ import logging
 import coloredlogs
 import time
 import struct
-from sklearn.utils import shuffle
+#from sklearn.utils import shuffle
 import random
 import json
 
@@ -20,7 +20,7 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 coloredlogs.install(fmt=fmt)
 
 class Collect():
-    def __init__(self, afl_work_dir, binary_path, ignore_ts, input_fix_len=300, from_file=True):
+    def __init__(self, afl_work_dir, binary_path, ignore_ts, engine ,input_fix_len=300, from_file=True):
         '''
         ignore_ts: ignore threshold, if the smaple number less than it, ignore
         input_fix_len : the fixed length of the input; if less, add 0; if more ,cut
@@ -37,7 +37,8 @@ class Collect():
         self.total_path_num       = 0
        
         self.from_file = from_file
-        self.json_file_path = "data.json"
+        self.engine    =  engine
+        self.json_file_path = engine+"data.json"
 
         self.input_fix_len = input_fix_len
 
@@ -138,10 +139,11 @@ class Path():
 
 
 def main():
-    afl_work_dir = os.path.join(cur_dir," output-afl")
+    engine="afl"
+    afl_work_dir = os.path.join(cur_dir, "output-"+engine)
     binary_path =  os.path.join(cur_dir, "benchmark/size")
     
-    collect = Collect(afl_work_dir, binary_path, ignore_ts=30)
+    collect = Collect(afl_work_dir, binary_path, ignore_ts=30, engine=engine)
     
     #1. collect the path of each input
     collect.collect_by_path()
