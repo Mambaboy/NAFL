@@ -29,7 +29,6 @@ class Collect():
     def __init__(self, afl_work_dir, binary_path, ignore_ts, engine , from_file=False):
         '''
         ignore_ts: ignore threshold, if the smaple number less than it, ignore
-        input_fix_len : the fixed length of the input; if less, add 0; if more ,cut
         '''
         self.afl_work_dir   = afl_work_dir
         self.all_data_dir   = os.path.join(afl_work_dir, "data")
@@ -49,10 +48,10 @@ class Collect():
         self.json_file_path = engine+"data.json"
 
         # all inputs it is huge 
-        self.inputs_with_label = list() #each element is a tuple, which is the inputs and bitmap paths
+        self.all_inputs_with_label = list() #each element is a tuple, which is the inputs and bitmap paths
 
         # get the useful index from the total bitmap
-        self.useful_index = set() #save the non -1 index of the total bitmap, meaning these index are used
+        self.useful_index = None # it is should a sorted one %XX ; save the non -1 index of the total bitmap, meaning these index are used
         self._useful_index_from_total_bitmap()
         
         self.reduce_tail = "-reduce"
@@ -60,45 +59,42 @@ class Collect():
 
 
 
-    def save_reduce_trace_bitmap(self, reduce_file, reduce_content):
-       
-        #content = bytes()
-        #for val in reduce_content:
-        #    content += struct.pack('c', val)
+      
+    def reduce_trace_bitmap(self, file):
 
-        with open(reduce_file, 'wb') as f:
-            f.write(reduce_content)
+        reduce_bitmap_path = file + self.reduce_tail
         
-        with open(reduce_file, 'rb') as f:
+        if os.path.exists( reduce_bitmap_path) and self.reduce_use_old:
+            return reduce_bitmap_path
+
+        # read the old bitmap
+        with open(file, "rb") as f:
+            content = f.read()
+
+        # read the data in useful index
+        reduce_bitmap= bytearray()
+        for index in self.useful_index:
+            reduce_bitmap.append(content[index])
+       
+        # save the useful index with the content
+        with open(reduce_bitmap_path, 'wb') as f:
+            f.write(reduce_bitmap)
+      
+        # test for checking
+        with open(reduce_bitmap_path, 'rb') as f:
             check_content=f.read()
         
         # for check
         for index in xrange( len(self.useful_index )):
-            if reduce_content[index] == check_content[index]:
+            if reduce_bitmap[index] == struct.unpack('B',check_content[index]):
                 continue
             else:
                 l.info("there is some wrong")
                 exit(1)
                 break
 
-    def reduce_trace_bitmap(self, file):
-
-        if os.path.exists(file+self.reduce_tail) and  self.reduce_use_old:
-            return
-
-        with open(file, "rb") as f:
-            content = f.read()
-            content = struct.unpack('c'*len(content), content) ## return a tuple  B mean unsign
-
-        reduce_content= bytearray()
-
-        for index in self.useful_index:
-            if content[index] == b'\x00':
-                reduce_content.append( b'\x00' )
-            else:
-                reduce_content.append( b'\x01' )
-
-        self.save_reduce_trace_bitmap(file+self.reduce_tail, reduce_content)
+        return reduce_bitmap_path
+  
 
     def collect_by_path(self):
         if self.from_file: 
@@ -108,36 +104,42 @@ class Collect():
 
         l.info("begin to collect the input, wait for some time")
         for path_hash in os.listdir(self.all_data_dir):
+            
             sole_data_dir = os.path.join(self.all_data_dir, path_hash)
-            path = Path(path_hash, sole_data_dir, self.ignore_ts)
+            
             # collect all input path
+            path = Path(path_hash, sole_data_dir, self.ignore_ts)
             input_paths = path.get_input_paths()
             bitmap_path = path.get_bitmap_path()
 
             #reduce the trace bitmap
-            self.reduce_trace_bitmap(bitmap_path)
+            reduce_bitmap_path = self.reduce_trace_bitmap(bitmap_path)
 
-            for sole_input in input_paths:
-                self.inputs_with_label.append( (sole_input, bitmap_path) )
+            if not reduce_bitmap_path in None and os.path.exists(reduce_bitmap_path):  
+                for sole_input in input_paths:
+                    self.all_inputs_with_label.append( (sole_input, bitmap_path) )
+            else:
+                l.info("reduce bitmap fail for %s", bitmap_path)
 
             # save the input number for each path
             self.path_num_dict.update({path_hash:path.inputs_num})
+
         # shuffle the list
         l.info("shuffle the inputs")
-        random.shuffle(self.inputs_with_label)
+        random.shuffle(self.all_inputs_with_label)
+
         self.save_to_json()
-        l.info("collect %d inputs with their bitmap!", len(self.inputs_with_label) )
+
+        l.info("collect %d inputs with their bitmap!", len(self.all_inputs_with_label) )
 
     '''
     in the bitmap, each byte denote a transition
+    just read do not transform
     '''
     def read_bitmap_content(self, file):
         f = open(file, "rb")
         content = f.read()
         f.close()
-
-        # transform to a strtr
-        #content = struct.unpack('c'*len(content), content) ## it is a tuple  b mean sign, B mean unsign
         
         return content
     
@@ -145,29 +147,34 @@ class Collect():
 
         content = self.read_bitmap_content(self.total_bitmap_path)  #the return type is tuple 
 
+        #collect the usefull index
+        useful_index=list()
         for index in xrange( len(content) ):
-            if not content[index]== '\xff':
-                self.useful_index.add(index)
+            if not content[index] == '\xff':
+                useful_index.append(index)
+
+        #transform to tuple
+        self.useful_index = tuple(useful_index)
+
         l.info("usefull indes has %d length", len(self.useful_index))
     
-
     def get_total_samples(self):
-        l.info("there are %s samples", len(self.inputs_with_label))
-        return len(self.inputs_with_label)
+        l.info("there are %s samples", len(self.all_inputs_with_label))
+        return len(self.all_inputs_with_label)
 
     def get_data(self):
-        return self.inputs_with_label
+        return self.all_inputs_with_label
 
     def save_to_json(self):
         with open(self.json_file_path, 'w') as outfile:
-            json.dump(self.inputs_with_label, outfile)
+            json.dump(self.all_inputs_with_label, outfile)
 
     def load_from_json(self):
         if not os.path.exists(self.json_file_path):
             l.warn("there is no %s", self.json_file_path)
             return False
         with open(self.json_file_path, 'r') as outfile:
-            self.inputs_with_label  = json.load( outfile )
+            self.all_inputs_with_label  = json.load( outfile )
         return True
 
 

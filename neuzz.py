@@ -90,8 +90,9 @@ class Nmodel():
         self.model.save("./model.h5")
         plot_model(self.model, to_file='model.png')
         
+    
     def train_model(self):
-      
+        l.info("training the modle")
         self.model.fit_generator( self.generator_train_data_by_batch(), 
                                   steps_per_epoch = self.train_sample_number/self.batch_size, 
                                   epochs = self.epochs, verbose=1,
@@ -99,30 +100,33 @@ class Nmodel():
                                   validation_steps = self.test_sample_number/self.batch_size 
  )
         
-
     def evaluate_model(self):
         score = self.model.evaluate(x_test, y_test, batch_size=self.batch_size)
    
     def _split_data(self):
+        l.info("the test rate is %f", self.test_rate)
+        train_inputs_with_label, test_inputs_with_label = train_test_split( self.all_inputs_with_label, test_size = self.test_rate)
 
-        self.train_inputs_with_label, self.test_inputs_with_label = train_test_split( self.all_inputs_with_label, test_size = self.test_rate)
+        # abandon some to fit the batch size
+        self.train_sample_number = int(len(train_inputs_with_label)/self.batch_size)*self.batch_size
+        self.test_sample_number = int(len(test_inputs_with_label)/self.batch_size)*self.batch_size
 
-        #deal with data
-        self.train_sample_number = len(self.train_inputs_with_label)/self.batch_size*self.batch_size
-        self.test_sample_number = len(self.test_inputs_with_label)/self.batch_size*self.batch_size
         if self.test_sample_number == 0:
-            l.warn("there are too little data")
+            l.warn("there are too little data, exit")
             exit(0)
-
-        self.train_inputs_with_label = self.train_inputs_with_label[0: self.train_sample_number]
-        self.test_inputs_with_label = self.test_inputs_with_label[0: self.test_sample_number]
         
+        # the last one is not included
+        self.train_inputs_with_label = train_inputs_with_label[0: self.train_sample_number]
+        self.test_inputs_with_label = test_inputs_with_label[0: self.test_sample_number]
         
 
-    def set_all_data(self, all_inputs_with_label):
-        self.all_inputs_with_label = all_inputs_with_label[0 : int(len(all_inputs_with_label)*self.use_rate) ]
+    def set_all_data(self , all_inputs_with_label):
+        
+        l.info("use %f samples for speed". self.use_rate)
+        self.all_inputs_with_label = all_inputs_with_label[0:int(len(all_inputs_with_label)*self.use_rate)]
         self.total_sample_number = len(self.all_inputs_with_label)
-
+        
+        # split the train data and test data
         self._split_data()
 
 
@@ -135,10 +139,10 @@ class Nmodel():
         if len(content) >= self.input_size:
             content = content[0:self.input_size]
         else:
-            content = content + b'\x00'*( self.input_size - len(content)) # the value is -128  to 127 , using b not B 
+            content = content.join( b'\x00'*(self.input_size-len(content)) ) 
 
         # transform
-        content = struct.unpack('b'*len(content), content) ## it is a tuple
+        content = struct.unpack('b'*len(content), content) ## it is a tuple, b means sign
 
         #normalization
         content = np.array(content).astype(np.float64)/255
@@ -154,19 +158,14 @@ class Nmodel():
         if len(content) >= self.output_size:
             content = content[0:self.output_size]
         else:
-            content = content + b'\x00'*( self.output_size - len(content)) # the value is -128  to 127 , using b not B 
+            content = content.join( b'\x00'*( self.output_size-len(content)) ) 
 
         # transform
-        content = struct.unpack('b'*len(content), content) ## it is a tuple
+        content = struct.unpack('B'*len(content), content) ## it is a tuple, B means unsing
         content = np.array(content)
         
         # normalization
         content = content.astype(np.bool).astype(np.int8)
-
-        #for i in xrange(len(content)-1):
-        #    if content[i]!=0:
-        #        l.info(content[i])
-        #        l.info(i)
 
         return content
 
@@ -182,18 +181,18 @@ class Nmodel():
             if train:
                 #l.info("gest index  %d", start_index+i )
                 input_path  = self.train_inputs_with_label[start_index +i][0]
-                bitmap_path = self.train_inputs_with_label[start_index +i][1]
+                reduce_bitmap_path = self.train_inputs_with_label[start_index +i][1]
             else:
                 input_path = self.test_inputs_with_label[start_index +i][0]
-                bitmap_path = self.test_inputs_with_label[start_index +i][1]
+                reduce_bitmap_path = self.test_inputs_with_label[start_index +i][1]
    
             input_content = self._read_input_content(input_path)
             input_content = np.reshape( input_content , (1, len(input_content), 1) )
             inputs_data = np.append( inputs_data, input_content, axis=0) 
 
-            bitmap_content = self._read_reduced_bitmap_content(bitmap_path)
-            bitmap_content = np.reshape( bitmap_content , (1, len(bitmap_content)) )
-            labels_data = np.append( labels_data, bitmap_content, axis=0)
+            reduce_bitmap_content = self._read_reduced_bitmap_content(reduce_bitmap_path)
+            reduce_bitmap_content = np.reshape( reduce_bitmap_content , (1, len(reduce_bitmap_content)) )
+            labels_data = np.append( labels_data, reduce_bitmap_content, axis=0)
 
         inputs_data = np.delete(inputs_data, 0, axis=0)
         labels_data = np.delete(labels_data, 0, axis=0)
@@ -211,7 +210,6 @@ class Nmodel():
         '''
         it is the generator for the fit_generator function
         '''
-        
         start_index = 0
         while True:
             start_index %= self.train_sample_number
@@ -235,16 +233,17 @@ class Nmodel():
 
 
 def test_part_data(  ):
-    #data source
+    
     #engine = "fair" 
     engine = "afl"
+    l.info("using the data from %s", engine)
 
     afl_work_dir = os.path.join(cur_dir, "output-"+engine )
     binary_path =  os.path.join(cur_dir, "benchmark/size")
     
     # init the collect 
-    collect = Collect( afl_work_dir =afl_work_dir, binary_path = binary_path, ignore_ts =ignore_ts, 
-                        input_fix_len = input_size, from_file= from_file, engine=engine)
+    collect = Collect( afl_work_dir = afl_work_dir, binary_path = binary_path, ignore_ts =ignore_ts, 
+                         from_file = from_file, engine = engine)
     
     #1. collect the path of each input
     l.info("begine to collect the data from %s", engine)
@@ -253,14 +252,14 @@ def test_part_data(  ):
 
     #2.init the model
     nmodel = Nmodel( input_size = input_size, output_size = output_size, 
-                    strides = strides, epochs = epochs, batch_size = batch_size , use_rate =use_rate, test_rate=test_rate )
+                    strides = strides, epochs = epochs, batch_size = batch_size ,
+                    use_rate =use_rate, test_rate=test_rate )
 
     nmodel.create_model()
-    
     nmodel.get_model_net()
     #exit(0)    
     
-    #2. read the content of each input
+    #3. read the content of each input
     all_inputs_with_label = collect.get_data()
     nmodel.set_all_data( all_inputs_with_label)
 
