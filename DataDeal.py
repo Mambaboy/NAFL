@@ -95,13 +95,12 @@ class Collect():
   
 
     def collect_by_path(self):
-        
         if self.from_file: 
             if self.load_from_json():
                 l.info("load from file")
                 return
-
         l.info("begin to collect the input, wait for some time")
+        l.info("reduce the bitmap")
         for path_hash in os.listdir(self.all_data_dir):
             
             sole_data_dir = os.path.join(self.all_data_dir, path_hash)
@@ -161,6 +160,9 @@ class Collect():
     def get_total_samples(self):
         l.info("there are %s samples", len(self.all_inputs_with_label))
         return len(self.all_inputs_with_label)
+
+    def get_length_reduce_bitmap(self):
+        return len(self.useful_index)
 
     def get_data(self):
         return self.all_inputs_with_label

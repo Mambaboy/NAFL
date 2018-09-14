@@ -23,8 +23,8 @@ coloredlogs.install(fmt=fmt)
 cur_dir = os.path.abspath(os.path.dirname(__file__))
 
 #for model
-input_size  = 400
-output_size = 1000
+max_input_size  = 400
+max_output_size = 6000  # this is the max
 strides = 3
 epochs = 2 
 batch_size = 1
@@ -122,7 +122,7 @@ class Nmodel():
 
     def set_all_data(self , all_inputs_with_label):
         
-        l.info("use %f samples for speed". self.use_rate)
+        l.info("use %f samples for speed", self.use_rate)
         self.all_inputs_with_label = all_inputs_with_label[0:int(len(all_inputs_with_label)*self.use_rate)]
         self.total_sample_number = len(self.all_inputs_with_label)
         
@@ -139,7 +139,7 @@ class Nmodel():
         if len(content) >= self.input_size:
             content = content[0:self.input_size]
         else:
-            content = content.join( b'\x00'*(self.input_size-len(content)) ) 
+            content = ''.join( [content, b'\x00' * (self.input_size-len(content) ) ] )
 
         # transform
         content = struct.unpack('b'*len(content), content) ## it is a tuple, b means sign
@@ -158,7 +158,7 @@ class Nmodel():
         if len(content) >= self.output_size:
             content = content[0:self.output_size]
         else:
-            content = content.join( b'\x00'*( self.output_size-len(content)) ) 
+            content = ''.join( [content,  b'\x00'* ( self.output_size-len(content)) ])
 
         # transform
         content = struct.unpack('B'*len(content), content) ## it is a tuple, B means unsing
@@ -244,14 +244,25 @@ def test_part_data(  ):
     # init the collect 
     collect = Collect( afl_work_dir = afl_work_dir, binary_path = binary_path, ignore_ts =ignore_ts, 
                          from_file = from_file, engine = engine)
+
+    reduce_output_size = collect.get_length_reduce_bitmap()
+    l.info("the length of reduce bitmap is %d", reduce_output_size)
     
+    output_size =reduce_output_size
+    if output_size > max_output_size:
+        output_size = max_output_size
+        l.info("use the max output_size of %d", max_output_size)
+
+    l.info("use the output_size of %d", output_size)
+
+     
     #1. collect the path of each input
     l.info("begine to collect the data from %s", engine)
     l.info("the ignore ts is %d", ignore_ts)
     collect.collect_by_path()
 
     #2.init the model
-    nmodel = Nmodel( input_size = input_size, output_size = output_size, 
+    nmodel = Nmodel( input_size = max_input_size, output_size = output_size, 
                     strides = strides, epochs = epochs, batch_size = batch_size ,
                     use_rate =use_rate, test_rate=test_rate )
 
