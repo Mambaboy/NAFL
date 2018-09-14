@@ -26,7 +26,7 @@ the default of trace bits if 0 for each byte
 '''
 
 class Collect():
-    def __init__(self, afl_work_dir, binary_path, ignore_ts, engine , from_file=False):
+    def __init__(self, afl_work_dir, binary_path, ignore_ts, engine, from_file=False):
         '''
         ignore_ts: ignore threshold, if the smaple number less than it, ignore
         '''
@@ -55,9 +55,7 @@ class Collect():
         self._useful_index_from_total_bitmap()
         
         self.reduce_tail = "-reduce"
-        self.reduce_use_old = True
-
-
+        self.reduce_use_old = False
 
       
     def reduce_trace_bitmap(self, file):
@@ -85,8 +83,8 @@ class Collect():
             check_content=f.read()
         
         # for check
-        for index in xrange( len(self.useful_index )):
-            if reduce_bitmap[index] == struct.unpack('B',check_content[index]):
+        for index in xrange(len(self.useful_index)):
+            if reduce_bitmap[index] == struct.unpack('B',check_content[index])[0]:
                 continue
             else:
                 l.info("there is some wrong")
@@ -97,6 +95,7 @@ class Collect():
   
 
     def collect_by_path(self):
+        
         if self.from_file: 
             if self.load_from_json():
                 l.info("load from file")
@@ -115,7 +114,7 @@ class Collect():
             #reduce the trace bitmap
             reduce_bitmap_path = self.reduce_trace_bitmap(bitmap_path)
 
-            if not reduce_bitmap_path in None and os.path.exists(reduce_bitmap_path):  
+            if not reduce_bitmap_path is None and os.path.exists(reduce_bitmap_path):  
                 for sole_input in input_paths:
                     self.all_inputs_with_label.append( (sole_input, bitmap_path) )
             else:
@@ -127,7 +126,8 @@ class Collect():
         # shuffle the list
         l.info("shuffle the inputs")
         random.shuffle(self.all_inputs_with_label)
-
+    
+        #save the collect file
         self.save_to_json()
 
         l.info("collect %d inputs with their bitmap!", len(self.all_inputs_with_label) )
@@ -224,7 +224,7 @@ def main():
     afl_work_dir = os.path.join(cur_dir, "output-"+engine)
     binary_path =  os.path.join(cur_dir, "benchmark/size")
     
-    collect = Collect(afl_work_dir, binary_path, ignore_ts=30, engine=engine)
+    collect = Collect(afl_work_dir, binary_path, ignore_ts=30, engine=engine, from_file =False)
 
     #1. collect the path of each input
     collect.collect_by_path()
