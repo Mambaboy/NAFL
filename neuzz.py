@@ -26,18 +26,18 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
-epochs = 2 
-batch_size = 1
-use_rate =0.0005
-test_rate=0.25
-
+epochs = 1 
+batch_size = 40
+use_rate = 0.005
+valid_rate=0.25
+test_rate =0
 #for collect
 ignore_ts = 20
 from_file = True  # data infor from
 
 
 class Nmodel():
-    def __init__(self, input_size, output_size, strides=1, batch_size=200, epochs=50, use_rate=1, test_rate=0.25):
+    def __init__(self, input_size, output_size, strides=1, batch_size=200, epochs=50, use_rate=1, valid_rate=0.25):
         
         self.input_size  =  input_size 
         self.output_size = output_size 
@@ -46,7 +46,7 @@ class Nmodel():
         self.epochs      = epochs
         self.batch_size  = batch_size
        
-        self.test_rate = test_rate 
+        self.valid_rate = valid_rate 
         self.use_rate = use_rate # cut the input for some rate for test
 
         self.all_inputs_with_label = None # the data path
@@ -104,8 +104,8 @@ class Nmodel():
         score = self.model.evaluate(x_test, y_test, batch_size=self.batch_size)
    
     def _split_data(self):
-        l.info("the test rate is %f", self.test_rate)
-        train_inputs_with_label, test_inputs_with_label = train_test_split( self.all_inputs_with_label, test_size = self.test_rate)
+        l.info("the test rate is %f", self.valid_rate)
+        train_inputs_with_label, test_inputs_with_label = train_test_split( self.all_inputs_with_label, test_size = self.valid_rate)
 
         # abandon some to fit the batch size
         self.train_sample_number = int(len(train_inputs_with_label)/self.batch_size)*self.batch_size
@@ -264,7 +264,7 @@ def test_part_data(  ):
     #2.init the model
     nmodel = Nmodel( input_size = max_input_size, output_size = output_size, 
                     strides = strides, epochs = epochs, batch_size = batch_size ,
-                    use_rate =use_rate, test_rate=test_rate )
+                    use_rate =use_rate, valid_rate=valid_rate )
 
     nmodel.create_model()
     nmodel.get_model_net()
