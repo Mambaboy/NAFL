@@ -26,7 +26,7 @@ the default of trace bits if 0 for each byte
 '''
 
 class Collect():
-    def __init__(self, afl_work_dir, binary_path, ignore_ts, engine, from_file=False):
+    def __init__(self, afl_work_dir, binary_path, ignore_ts, engine, from_file=False, reduce_use_old=False):
         '''
         ignore_ts: ignore threshold, if the smaple number less than it, ignore
         '''
@@ -55,36 +55,43 @@ class Collect():
         self._useful_index_from_total_bitmap()
         
         self.reduce_tail = "-reduce"
-        self.reduce_use_old = False
+        self.reduce_use_old = reduce_use_old
 
       
-    def reduce_trace_bitmap(self, file):
+    def reduce_trace_bitmap(self, old_bitmap_path):
 
-        reduce_bitmap_path = file + self.reduce_tail
+        reduce_bitmap_path = old_bitmap_path + self.reduce_tail
         
         if os.path.exists( reduce_bitmap_path) and self.reduce_use_old:
             return reduce_bitmap_path
 
         # read the old bitmap
-        with open(file, "rb") as f:
+        with open(old_bitmap_path, "rb") as f:
             content = f.read()
-
+            #for test
+            #num = self.sum_non_values_in_content( content, b'\x00')
+            #l.info("there is %d 1 in the trace of %s", num, old_bitmap_path)
+            
         # read the data in useful index
-        reduce_bitmap= bytearray()
+        reduce_bitmap_content= bytearray()
         for index in self.useful_index:
-            reduce_bitmap.append(content[index])
+            reduce_bitmap_content.append(content[index])
        
         # save the useful index with the content
         with open(reduce_bitmap_path, 'wb') as f:
-            f.write(reduce_bitmap)
-      
+            f.write(reduce_bitmap_content)
+           
+            # for test
+            #num = self.sum_non_values_in_content( reduce_bitmap_content, 0)
+            #l.info("there is %d 1 in the trace of %s", num, reduce_bitmap_path)
+        
         # test for checking
         with open(reduce_bitmap_path, 'rb') as f:
             check_content=f.read()
         
         # for check
         for index in xrange(len(self.useful_index)):
-            if reduce_bitmap[index] == struct.unpack('B',check_content[index])[0]:
+            if reduce_bitmap_content[index] == struct.unpack('B',check_content[index])[0]:
                 continue
             else:
                 l.info("there is some wrong")
@@ -92,7 +99,14 @@ class Collect():
                 break
 
         return reduce_bitmap_path
-  
+
+    @staticmethod
+    def sum_non_values_in_content( content, value):
+        num =0
+        for index in xrange( len(content) ):
+            if content[index] != value:
+                num+=1
+        return num
 
     def collect_by_path(self):
         if self.from_file: 
@@ -101,6 +115,7 @@ class Collect():
                 return
         l.info("begin to collect the input, wait for some time")
         l.info("reduce the bitmap")
+        
         for path_hash in os.listdir(self.all_data_dir):
             
             sole_data_dir = os.path.join(self.all_data_dir, path_hash)
@@ -115,12 +130,13 @@ class Collect():
 
             if not reduce_bitmap_path is None and os.path.exists(reduce_bitmap_path):  
                 for sole_input in input_paths:
-                    self.all_inputs_with_label.append( (sole_input, bitmap_path) )
+                    self.all_inputs_with_label.append( (sole_input, reduce_bitmap_path) )
             else:
                 l.info("reduce bitmap fail for %s", bitmap_path)
 
             # save the input number for each path
             self.path_num_dict.update({path_hash:path.inputs_num})
+
 
         # shuffle the list
         l.info("shuffle the inputs")
@@ -168,6 +184,9 @@ class Collect():
         return self.all_inputs_with_label
 
     def save_to_json(self):
+        if os.path.exists(self.json_file_path):
+            os.remove(self.json_file_path)
+
         with open(self.json_file_path, 'w') as outfile:
             json.dump(self.all_inputs_with_label, outfile)
 
@@ -226,7 +245,7 @@ def main():
     afl_work_dir = os.path.join(cur_dir, "output-"+engine)
     binary_path =  os.path.join(cur_dir, "benchmark/size")
     
-    collect = Collect(afl_work_dir, binary_path, ignore_ts=30, engine=engine, from_file =False)
+    collect = Collect(afl_work_dir, binary_path, ignore_ts=30, engine=engine, from_file =False, reduce_use_old =False)
 
     #1. collect the path of each input
     collect.collect_by_path()

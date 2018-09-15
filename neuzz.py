@@ -26,14 +26,20 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
-epochs = 1 
+epochs = 50
 batch_size = 40
-use_rate = 0.005
+use_rate = 0.75
 valid_rate=0.25
 test_rate =0
+
 #for collect
 ignore_ts = 20
 from_file = True  # data infor from
+reduce_use_old = False
+#engine = "fair" 
+engine = "afl"
+l.info("using the data from %s", engine)
+
 
 
 class Nmodel():
@@ -136,36 +142,35 @@ class Nmodel():
         f.close()
 
         # control the length
-        if len(content) >= self.input_size:
+        if len(content) > self.input_size:
             content = content[0:self.input_size]
-        else:
+        elif len(content) < self.input_size:
             content = ''.join( [content, b'\x00' * (self.input_size-len(content) ) ] )
 
         # transform
         content = struct.unpack('b'*len(content), content) ## it is a tuple, b means sign
 
         #normalization
-        content = np.array(content).astype(np.float64)/255
+        content = np.array(content).astype(np.float64)/255 # between -1 1
         
         return content
 
-    def _read_reduced_bitmap_content(self, file):
+    def _read_label_content(self, file):
         f = open(file, "rb")
         content = f.read()
         f.close()
         
         # control the length
-        if len(content) >= self.output_size:
+        if len(content) > self.output_size:
             content = content[0:self.output_size]
-        else:
+        elif len(content) < self.output_size :
             content = ''.join( [content,  b'\x00'* ( self.output_size-len(content)) ])
 
         # transform
         content = struct.unpack('B'*len(content), content) ## it is a tuple, B means unsing
-        content = np.array(content)
-        
+
         # normalization
-        content = content.astype(np.bool).astype(np.int8)
+        content = (np.array(content) >0 ).astype(np.int8)
 
         return content
 
@@ -190,8 +195,13 @@ class Nmodel():
             input_content = np.reshape( input_content , (1, len(input_content), 1) )
             inputs_data = np.append( inputs_data, input_content, axis=0) 
 
-            reduce_bitmap_content = self._read_reduced_bitmap_content(reduce_bitmap_path)
+            reduce_bitmap_content = self._read_label_content(reduce_bitmap_path)
             reduce_bitmap_content = np.reshape( reduce_bitmap_content , (1, len(reduce_bitmap_content)) )
+            
+            # for test
+            #num= Collect.sum_non_values_in_content(reduce_bitmap_content[0], 0) 
+            #l.info("there is %d 1 in the trace of %s", num, reduce_bitmap_path)
+            
             labels_data = np.append( labels_data, reduce_bitmap_content, axis=0)
 
         inputs_data = np.delete(inputs_data, 0, axis=0)
@@ -232,18 +242,53 @@ class Nmodel():
             yield (inputs_data, labels_data)
 
 
-def test_part_data(  ):
-    
-    #engine = "fair" 
-    engine = "afl"
-    l.info("using the data from %s", engine)
+    def turn_to_binary_value_by_ts(self, content, ts):
+        '''
+        value <= ts is 0
+        value > tx is 1
+        '''
+        content = np.array( content)
+        content = (content > ts).astype(np.int8) 
+        return content
 
+    def predict(self, size =10):
+        inputs_data,labels_data = self.read_samples_by_size(size , train = False)
+        result = self.model.predict( inputs_data, batch_size =5, verbose=1)
+      
+        for i in xrange(size):
+            num=0
+            a=list()
+            for index in xrange(len(labels_data[i])):
+                if labels_data[i][index] ==1:
+                    num+=1
+                    a.append(index)
+            l.info("there is %d number 1 in the label", num)
+            #l.info(a)
+            for ts in [0.5]:
+                num=0
+                b=list()
+                temp_result = self.turn_to_binary_value_by_ts(result[i], ts)
+                for index in xrange(len(temp_result)):
+                    if temp_result[index] == 1:
+                        num+=1
+                        b.append(index)
+                #l.info(b)
+                l.info("there is %d number large than %f", num, ts)
+
+                d1=np.sum(np.abs(labels_data[i] - temp_result))
+                l.info("the Manhattan Distance is %d", d1)
+            l.info("")
+
+
+
+def start(  ):
+    
     afl_work_dir = os.path.join(cur_dir, "output-"+engine )
     binary_path =  os.path.join(cur_dir, "benchmark/size")
     
     # init the collect 
     collect = Collect( afl_work_dir = afl_work_dir, binary_path = binary_path, ignore_ts =ignore_ts, 
-                         from_file = from_file, engine = engine)
+                         from_file = from_file, engine = engine, reduce_use_old =False)
 
     reduce_output_size = collect.get_length_reduce_bitmap()
     l.info("the length of reduce bitmap is %d", reduce_output_size)
@@ -275,7 +320,7 @@ def test_part_data(  ):
     nmodel.set_all_data( all_inputs_with_label)
 
     # for test
-    nmodel.read_samples_by_size(10)
+    #nmodel.read_samples_by_size(10)
     #exit(0)
 
     # train the model
@@ -284,9 +329,12 @@ def test_part_data(  ):
     # save the model
     #nmodel.save_model()
 
+    l.info("begin to predict")
+    nmodel.predict()
+
 
 def main():
-    test_part_data(  )
+    start(  )
 
 if __name__ == "__main__":
     main()
