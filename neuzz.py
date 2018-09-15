@@ -26,9 +26,9 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
-epochs = 50
+epochs = 1
 batch_size = 40
-use_rate = 0.75
+use_rate = 0.0055
 valid_rate=0.25
 test_rate =0
 
@@ -87,7 +87,8 @@ class Nmodel():
 
         self.model.add( Activation("sigmoid",name="sigmoid") )
 
-        self.model.compile(loss='binary_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
+        # the accuracy and optimizer
+        self.model.compile(loss='binary_crossentropy', optimizer='rmsprop', metrics=['accuracy'])  
 
     def get_model_net(self):
         l.info(self.model.summary())
@@ -103,12 +104,8 @@ class Nmodel():
                                   steps_per_epoch = self.train_sample_number/self.batch_size, 
                                   epochs = self.epochs, verbose=1,
                                   validation_data = self.generator_test_data_by_batch(),
-                                  validation_steps = self.test_sample_number/self.batch_size 
- )
+                                  validation_steps = self.test_sample_number/self.batch_size )
         
-    def evaluate_model(self):
-        score = self.model.evaluate(x_test, y_test, batch_size=self.batch_size)
-   
     def _split_data(self):
         l.info("the test rate is %f", self.valid_rate)
         train_inputs_with_label, test_inputs_with_label = train_test_split( self.all_inputs_with_label, test_size = self.valid_rate)
@@ -251,6 +248,11 @@ class Nmodel():
         content = (content > ts).astype(np.int8) 
         return content
 
+    def evaluate(self, size=10):
+        inputs_data,labels_data = self.read_samples_by_size(size , train = False)
+        result = self.model.evaluate(inputs_data, labels_data, verbose =1)
+        return result
+
     def predict(self, size =10):
         inputs_data,labels_data = self.read_samples_by_size(size , train = False)
         result = self.model.predict( inputs_data, batch_size =5, verbose=1)
@@ -329,8 +331,11 @@ def start(  ):
     # save the model
     #nmodel.save_model()
 
-    l.info("begin to predict")
-    nmodel.predict()
+    #l.info("begin to predict")
+    #nmodel.predict()
+
+    l.info("begin to evalute")
+    evaluate_result = nmodel.evaluate()
 
 
 def main():
