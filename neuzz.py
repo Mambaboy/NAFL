@@ -2,6 +2,7 @@
 #coding=utf-8
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation,Flatten
+from keras import  activations
 from keras.layers import Embedding
 from keras.layers import Conv1D, GlobalAveragePooling1D, MaxPooling1D 
 import numpy as np
@@ -13,6 +14,8 @@ from DataDeal import *
 import struct
 
 from sklearn.model_selection import train_test_split
+from vis.visualization import visualize_saliency
+from vis.utils import utils
 
 
 l=logging.getLogger("NEUZZ")
@@ -27,8 +30,8 @@ max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
 epochs = 1
-batch_size = 40
-use_rate = 0.0055
+batch_size = 50
+use_rate = 0.005
 valid_rate=0.25
 test_rate =0
 
@@ -79,11 +82,12 @@ class Nmodel():
         self.model.add( Dropout(0.25) )
 
         self.model.add( Flatten() )
-        self.model.add( Dense(self.output_size*1, activation='relu', name="full_connect_layer1") )
         
-        #self.model.add(Dropout(0.25))
+        self.model.add( Dense(self.output_size*2, activation='relu', name="full_connect_layer1") )
         
-        #self.model.add(Dense( self.output_size, name="full_connect_layer2"))
+        self.model.add(Dropout(0.25))
+        
+        self.model.add(Dense( self.output_size, name="full_connect_layer2"))
 
         self.model.add( Activation("sigmoid",name="sigmoid") )
 
@@ -253,7 +257,7 @@ class Nmodel():
         result = self.model.evaluate(inputs_data, labels_data, verbose =1)
         return result
 
-    def predict(self, size =10):
+    def predict(self, size =30):
         inputs_data,labels_data = self.read_samples_by_size(size , train = False)
         result = self.model.predict( inputs_data, batch_size =5, verbose=1)
       
@@ -280,6 +284,22 @@ class Nmodel():
                 d1=np.sum(np.abs(labels_data[i] - temp_result))
                 l.info("the Manhattan Distance is %d", d1)
             l.info("")
+    
+    def saliency(self):
+        inputs_data, labels_data = self.read_samples_by_size(1)
+        print inputs_data[0].shape
+        
+        layer_idx = utils.find_layer_idx(self.model, 'sigmoid')
+        # Swap sigmoid with linear
+        self.model.layers[layer_idx].activation = activations.linear
+        model = utils.apply_modifications(self.model)
+
+        #saliency
+        result = visualize_saliency(model, layer_idx=layer_idx,  filter_indices=[1] , seed_input = inputs_data[0],  backprop_modifier=None ,  grad_modifier="absolute")
+        print result.shape
+
+
+        
 
 
 
@@ -334,8 +354,10 @@ def start(  ):
     #l.info("begin to predict")
     #nmodel.predict()
 
-    l.info("begin to evalute")
-    evaluate_result = nmodel.evaluate()
+    #l.info("begin to evalute")
+    #evaluate_result = nmodel.evaluate()
+
+    nmodel.saliency()
 
 
 def main():
