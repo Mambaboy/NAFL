@@ -242,8 +242,9 @@ def main():
     engine="afl"
     l.info("using the data from %s", engine)
 
-    afl_work_dir = os.path.join(cur_dir, "output-"+engine)
     binary_path =  os.path.join(cur_dir, "benchmark/size")
+    binary = os.path.basename(binary_path)
+    afl_work_dir = os.path.join(cur_dir, "output-"+engine+'-'+binary)
     
     collect = Collect(afl_work_dir, binary_path, ignore_ts=30, engine=engine, from_file =False, reduce_use_old =False)
 

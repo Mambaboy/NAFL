@@ -36,6 +36,7 @@ valid_rate=0.25
 test_rate =0
 
 #for collect
+binary_path =  os.path.join(cur_dir, "benchmark/size")
 ignore_ts = 20
 from_file = True  # data infor from
 reduce_use_old = False
@@ -305,8 +306,8 @@ class Nmodel():
 
 def start(  ):
     
-    afl_work_dir = os.path.join(cur_dir, "output-"+engine )
-    binary_path =  os.path.join(cur_dir, "benchmark/size")
+    binary =os.path.basename(binary_path)
+    afl_work_dir = os.path.join(cur_dir, "output-"+engine+'-'+binary )
     
     # init the collect 
     collect = Collect( afl_work_dir = afl_work_dir, binary_path = binary_path, ignore_ts =ignore_ts, 
