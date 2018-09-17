@@ -34,16 +34,16 @@ max_output_size = 6000  # this is the max
 strides = 3
 epochs = 5
 batch_size = 32
-use_rate = 1
+use_rate = 0.5
 valid_rate=0.25
 test_rate =0
 
 #for collect
-#engine = "fair" 
-engine = "afl"
-binary_path =  os.path.join(cur_dir, "benchmark/test")
+engine = "fair" 
+#engine ="afl"
+binary_path =  os.path.join(cur_dir, "benchmark/jhead-nb")
 ignore_ts = 10  # if the number of samples for one class is smaller than it, ignore
-from_file = False  # data infor from
+from_file = True  # data infor from
 reduce_use_old = False
 l.info("using the data from %s", engine)
 
@@ -71,6 +71,11 @@ class Nmodel():
         self.test_sample_number = 0  
 
         self.model       = Sequential()
+
+        self.useful_index = None
+
+    def set_useful_index(self, useful_index):
+        self.useful_index = useful_index
 
     def create_model(self):
         self.model.add( Conv1D(64, 9, strides=self.strides,  padding="same", input_shape=(self.input_size, 1) ) )
@@ -318,7 +323,7 @@ class Nmodel():
         result = visualize_saliency(model, layer_idx=layer_idx,  filter_indices=[1] , seed_input = inputs_data[0],  backprop_modifier=None ,  grad_modifier="absolute")
 
         #plot the result
-        self.plot_saliency(result) 
+        #self.plot_saliency(result) 
         l.info(result)
        
         
@@ -359,6 +364,9 @@ def start(  ):
     #3. read the content of each input
     all_inputs_with_label = collect.get_data()
     nmodel.set_all_data( all_inputs_with_label)
+    
+    useful_index = collect.get_useful_index()
+    nmodel.set_useful_index(useful_index)
 
     # for test
     #nmodel.read_samples_by_size(10)

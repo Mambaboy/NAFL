@@ -173,6 +173,9 @@ class Collect():
 
         l.info("usefull indes has %d length", len(self.useful_index))
     
+    def get_useful_index(self):
+        return self.useful_index
+    
     def get_total_samples(self):
         l.info("there are %s samples", len(self.all_inputs_with_label))
         return len(self.all_inputs_with_label)
