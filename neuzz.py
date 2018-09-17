@@ -1,17 +1,19 @@
 
 #coding=utf-8
+import coloredlogs
+import logging
+from DataDeal import *
+import struct
+
+import keras
+from keras.utils import plot_model
+from keras.models import load_model
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation,Flatten
 from keras import  activations
 from keras.layers import Embedding
 from keras.layers import Conv1D, GlobalAveragePooling1D, MaxPooling1D 
 import numpy as np
-import keras
-from keras.utils import plot_model
-import coloredlogs
-import logging
-from DataDeal import *
-import struct
 
 from sklearn.model_selection import train_test_split
 from vis.visualization import visualize_saliency
@@ -32,11 +34,12 @@ import os
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
-epochs = 5
+epochs = 7
 batch_size = 32
-use_rate = 0.5
+use_rate = 1
 valid_rate=0.25
 test_rate =0
+use_old_model=True # load model from file
 
 #for collect
 engine = "fair" 
@@ -49,7 +52,7 @@ l.info("using the data from %s", engine)
 
 
 class Nmodel():
-    def __init__(self, input_size, output_size, strides=1, batch_size=200, epochs=50, use_rate=1, valid_rate=0.25):
+    def __init__(self, input_size, output_size, strides=1, batch_size=200, epochs=50, use_rate=1, valid_rate=0.25, use_old_model  =False):
         
         self.input_size  =  input_size 
         self.output_size = output_size 
@@ -60,6 +63,7 @@ class Nmodel():
        
         self.valid_rate = valid_rate 
         self.use_rate = use_rate # cut the input for some rate for test
+        self.use_old_model = use_old_model # load model from file
 
         self.all_inputs_with_label = None # the data path
         self.total_sample_number = 0  #all the sample size, including the train and test
@@ -71,6 +75,7 @@ class Nmodel():
         self.test_sample_number = 0  
 
         self.model       = Sequential()
+        self.model_file_path =  os.path.join(cur_dir,"neuzz.h5")
 
         self.useful_index = None
 
@@ -106,16 +111,29 @@ class Nmodel():
         l.info(self.model.summary())
     
     def save_model(self):
-        self.model.save("./model.h5")
-        plot_model(self.model, to_file='model.png')
+        if os.path.exists(self.model_file_path):
+            os.remove(self.model_file_path)
+        self.model.save(self.model_file_path)
+        #plot_model(self.model, to_file='model.png')
+
+    def load_model(self):
+        self.model =load_model(self.model_file_path)
         
     def train_model(self):
+
+        if self.use_old_model and os.path.exists(self.model_file_path):
+            l.info("load old model from file")
+            self.load_model()
+            return
+
         l.info("training the modle")
         self.model.fit_generator( self.generator_train_data_by_batch(), 
                                   steps_per_epoch = self.train_sample_number/self.batch_size, 
                                   epochs = self.epochs, verbose=1,
                                   validation_data = self.generator_test_data_by_batch(),
                                   validation_steps = self.test_sample_number/self.batch_size )
+        # save the model
+        self.save_model()
         
     def _split_data(self):
         l.info("the test rate is %f", self.valid_rate)
@@ -310,9 +328,9 @@ class Nmodel():
         io.show()
 
 
-    def saliency(self):
-        inputs_data, labels_data = self.read_samples_by_size(1)
-        print inputs_data[0].shape
+    def saliency(self, input_path, output_index):
+        l.info("calculate for the %d transition for %s", self.useful_index[output_index], input_path)
+        input_content = self._read_input_content(input_path)
         
         layer_idx = utils.find_layer_idx(self.model, 'sigmoid')
         # Swap sigmoid with linear
@@ -320,14 +338,15 @@ class Nmodel():
         model = utils.apply_modifications(self.model)
 
         #saliency
-        result = visualize_saliency(model, layer_idx=layer_idx,  filter_indices=[1] , seed_input = inputs_data[0],  backprop_modifier=None ,  grad_modifier="absolute")
+        result = visualize_saliency(model, layer_idx=layer_idx,  filter_indices=[output_index] , seed_input = input_content,
+                                    backprop_modifier=None ,  grad_modifier="absolute")
 
         #plot the result
         #self.plot_saliency(result) 
         l.info(result)
        
         
-def start(  ):
+def start():
     
     binary =os.path.basename(binary_path)
     afl_work_dir = os.path.join(cur_dir, "output-"+engine+'-'+binary )
@@ -355,7 +374,7 @@ def start(  ):
     #2.init the model
     nmodel = Nmodel( input_size = max_input_size, output_size = output_size, 
                     strides = strides, epochs = epochs, batch_size = batch_size ,
-                    use_rate =use_rate, valid_rate=valid_rate )
+                    use_rate =use_rate, valid_rate=valid_rate, use_old_model =use_old_model )
 
     nmodel.create_model()
     nmodel.get_model_net()
@@ -373,10 +392,7 @@ def start(  ):
     #exit(0)
 
     # train the model
-    nmodel.train_model()
-
-    # save the model
-    #nmodel.save_model()
+    nmodel.train_model( )
 
     #l.info("begin to predict")
     #nmodel.predict()
@@ -384,7 +400,8 @@ def start(  ):
     #l.info("begin to evalute")
     #evaluate_result = nmodel.evaluate()
 
-    nmodel.saliency()
+    check_input_path= None
+    nmodel.saliency(check_input_path, i)
 
 
 def main():
