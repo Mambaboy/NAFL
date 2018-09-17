@@ -4052,14 +4052,14 @@ static void show_stats(void) {
 
   SAYF(TERM_HOME);
 
-  if (term_too_small) {
+  //if (term_too_small) {
 
-    SAYF(cBRI "Your terminal is too small to display the UI.\n"
-         "Please resize terminal window to at least 80x25.\n" cRST);
+  //  SAYF(cBRI "Your terminal is too small to display the UI.\n"
+  //       "Please resize terminal window to at least 80x25.\n" cRST);
 
-    return;
+  //  return;
 
-  }
+  //}
 
   /* Let's start by drawing a centered banner. */
 
