@@ -17,33 +17,35 @@ from sklearn.model_selection import train_test_split
 from vis.visualization import visualize_saliency
 from vis.utils import utils
 
+from skimage import io
 
 l=logging.getLogger("NEUZZ")
 l.setLevel("INFO") 
 fmt = "%(asctime)-15s %(filename)s:%(lineno)d %(process)d %(levelname)s %(message)s"
 coloredlogs.install(fmt=fmt)
 
-cur_dir = os.path.abspath(os.path.dirname(__file__))
+#cur_dir = os.path.abspath(os.path.dirname(__file__))
+cur_dir= '/home/xiaosatianyu/workspace/git/fuzz/NAFL'
+import os
 
 #for model
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
 epochs = 1
-batch_size = 50
+batch_size = 32
 use_rate = 0.005
 valid_rate=0.25
 test_rate =0
 
 #for collect
-binary_path =  os.path.join(cur_dir, "benchmark/size")
-ignore_ts = 20
-from_file = True  # data infor from
-reduce_use_old = False
 #engine = "fair" 
 engine = "afl"
+binary_path =  os.path.join(cur_dir, "benchmark/test")
+ignore_ts = 10  # if the number of samples for one class is smaller than it, ignore
+from_file = False  # data infor from
+reduce_use_old = False
 l.info("using the data from %s", engine)
-
 
 
 class Nmodel():
@@ -102,7 +104,6 @@ class Nmodel():
         self.model.save("./model.h5")
         plot_model(self.model, to_file='model.png')
         
-    
     def train_model(self):
         l.info("training the modle")
         self.model.fit_generator( self.generator_train_data_by_batch(), 
@@ -126,7 +127,6 @@ class Nmodel():
         # the last one is not included
         self.train_inputs_with_label = train_inputs_with_label[0: self.train_sample_number]
         self.test_inputs_with_label = test_inputs_with_label[0: self.test_sample_number]
-        
 
     def set_all_data(self , all_inputs_with_label):
         
@@ -136,7 +136,6 @@ class Nmodel():
         
         # split the train data and test data
         self._split_data()
-
 
     def _read_input_content(self, file):
         f = open(file, "rb")
@@ -192,7 +191,12 @@ class Nmodel():
             else:
                 input_path = self.test_inputs_with_label[start_index +i][0]
                 reduce_bitmap_path = self.test_inputs_with_label[start_index +i][1]
-   
+  
+            #for test
+            if size ==1:
+                l.info("input_path: %s",input_path)
+                l.info("reduce_bitmap_path: %s", reduce_bitmap_path)
+
             input_content = self._read_input_content(input_path)
             input_content = np.reshape( input_content , (1, len(input_content), 1) )
             inputs_data = np.append( inputs_data, input_content, axis=0) 
@@ -204,7 +208,7 @@ class Nmodel():
             #num= Collect.sum_non_values_in_content(reduce_bitmap_content[0], 0) 
             #l.info("there is %d 1 in the trace of %s", num, reduce_bitmap_path)
             
-            labels_data = np.append( labels_data, reduce_bitmap_content, axis=0)
+            labels_data = np.append( labels_data, reduce_bitmap_content, axis=0 )
 
         inputs_data = np.delete(inputs_data, 0, axis=0)
         labels_data = np.delete(labels_data, 0, axis=0)
@@ -214,7 +218,6 @@ class Nmodel():
         #l.info("inputs_data shape %s", inputs_data.shape)
         #l.info("labels_data shape %s", labels_data.shape)
         #l.info("\n")
-        
         return (inputs_data, labels_data)
     
     
@@ -234,7 +237,6 @@ class Nmodel():
         '''
         it is the generator for the fit_generator function
         '''
-        
         start_index = 0
         while True:
             start_index %= self.test_sample_number
@@ -285,7 +287,24 @@ class Nmodel():
                 d1=np.sum(np.abs(labels_data[i] - temp_result))
                 l.info("the Manhattan Distance is %d", d1)
             l.info("")
-    
+   
+    def plot_saliency(self,data):
+        data_length = len(data)
+        
+        #add the second 
+        temp=np.reshape(data, (data_length,1)  )
+        temp=np.repeat(temp, data_length/2, axis=1)
+
+        #add the third
+        temp=np.reshape(temp, (data_length,data_length/2,1))
+        temp=np.repeat(temp, 3,axis=2)
+
+        # turn the color
+        temp=255-temp
+        dst=io.imshow(temp)
+        io.show()
+
+
     def saliency(self):
         inputs_data, labels_data = self.read_samples_by_size(1)
         print inputs_data[0].shape
@@ -297,13 +316,12 @@ class Nmodel():
 
         #saliency
         result = visualize_saliency(model, layer_idx=layer_idx,  filter_indices=[1] , seed_input = inputs_data[0],  backprop_modifier=None ,  grad_modifier="absolute")
-        print result.shape
 
-
+        #plot the result
+        self.plot_saliency(result) 
+        l.info(result)
+       
         
-
-
-
 def start(  ):
     
     binary =os.path.basename(binary_path)

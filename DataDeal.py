@@ -45,7 +45,7 @@ class Collect():
        
         self.from_file = from_file
         self.engine    =  engine
-        self.json_file_path = engine+"data.json"
+        self.json_file_path = engine+"-"+ self.binary+"-" +"data.json"
 
         # all inputs it is huge 
         self.all_inputs_with_label = list() #each element is a tuple, which is the inputs and bitmap paths
@@ -242,7 +242,7 @@ def main():
     engine="afl"
     l.info("using the data from %s", engine)
 
-    binary_path =  os.path.join(cur_dir, "benchmark/size")
+    binary_path =  os.path.join(cur_dir, "benchmark/test")
     binary = os.path.basename(binary_path)
     afl_work_dir = os.path.join(cur_dir, "output-"+engine+'-'+binary)
     

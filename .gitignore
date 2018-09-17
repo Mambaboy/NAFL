@@ -12,3 +12,4 @@ output-afl.tar.gz
 output-fair.tar.gz
 fairdata.json
 afldata.json
+*.json
