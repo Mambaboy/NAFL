@@ -32,9 +32,9 @@ import os
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
-epochs = 1
+epochs = 5
 batch_size = 32
-use_rate = 0.005
+use_rate = 1
 valid_rate=0.25
 test_rate =0
 
