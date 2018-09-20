@@ -2838,13 +2838,20 @@ u32 filecnt(u8* filename)
 }
 
 // write current input to data
-static void write_to_DATA(void* mem, u32 len, u32 path_hash ) {
+static void write_to_DATA(void* mem, u32 len ) {
 
   s32 fd;
   u32 tc_hash=hash32(mem, len, HASH_CONST);
   u8 * dir;
   u8 * file;
   
+  // path hash 
+  u8 * trace_mini = ck_alloc(MAP_SIZE >> 3);
+  minimize_bits(trace_mini, trace_bits);
+  u32 path_hash=hash32(trace_mini, MAP_SIZE>>3, HASH_CONST);
+  ck_free(trace_mini);
+  //u32 path_hash = hash32(trace_bits, MAP_SIZE, HASH_CONST);
+
   // mkdir 
   dir = alloc_printf("%s/data/%u", out_dir, path_hash);
   if ( access(dir,F_OK)==-1 ) {
@@ -5018,7 +5025,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
 
   fault = run_target(argv, exec_tmout);
   //save the data
-  write_to_DATA(out_buf, len, hash32(trace_bits, MAP_SIZE, HASH_CONST));
+  write_to_DATA(out_buf, len);
 
   if (vanilla_afl) --vanilla_afl;
 
