@@ -2547,7 +2547,7 @@ static void write_to_DATA(void* mem, u32 len ) {
   u32 file_num=filecnt(dir);
   ck_free(dir);
   
-  if ( file_num > 30 )
+  if ( file_num > SAVE_UPPER )
       return;
 
   

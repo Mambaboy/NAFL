@@ -347,4 +347,6 @@
 
 // #define IGNORE_FINDS
 
+#define SAVE_UPPER 100
+
 #endif /* ! _HAVE_CONFIG_H */
