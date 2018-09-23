@@ -4,6 +4,7 @@ import logging
 from DataDeal import *
 import struct
 from collections import OrderedDict
+import os
 
 import keras
 from keras.utils import plot_model
@@ -26,18 +27,16 @@ l.setLevel("INFO")
 fmt = "%(asctime)-15s %(filename)s:%(lineno)d %(process)d %(levelname)s %(message)s"
 coloredlogs.install(fmt=fmt)
 
-import os
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
-#cur_dir = os.path.abspath(os.path.dirname(__file__))
-cur_dir= '/home/xiaosatianyu/workspace/git/fuzz/NAFL'
-
-
+cur_dir = os.path.abspath(os.path.dirname(__file__))
 #for model
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
 batch_size = 50
+epochs = 1
+use_rate = 0.005
 valid_rate=0.25
 test_rate =0.25
 
@@ -46,12 +45,13 @@ use_rate = 1
 epochs = 5
 
 #for collect
-engine = "fair" 
-#engine ="afl"
+#engine = "fair" 
+engine ="afl"
 binary_path =  os.path.join(cur_dir, "benchmark/jhead-nb")
 ignore_ts = 10  # if the number of samples for one class is smaller than it, ignore
 from_file = True  # data infor from
 reduce_use_old = True
+l.info("using the data from %s", engine)
 
 
 class Nmodel():
@@ -168,12 +168,13 @@ class Nmodel():
         f = open(file, "rb")
         content = f.read()
         f.close()
-
+        
+        content = bytearray(content)
         # control the length
-        if len(content) > self.input_size:
-            content = content[0:self.input_size]
-        elif len(content) < self.input_size:
-            content = ''.join( [content, b'\x00' * (self.input_size-len(content) ) ] )
+        if len(content) < self.input_size:
+            content.extend( [0] * (self.input_size - len(content) ) )
+        elif len(content) > self.input_size:
+            content = content[0:self.input_size ] 
 
         # transform
         content = struct.unpack('b'*len(content), content) ## it is a tuple, b means sign
@@ -189,10 +190,10 @@ class Nmodel():
         f.close()
         
         # control the length
-        if len(content) > self.output_size:
-            content = content[0:self.output_size]
-        elif len(content) < self.output_size :
-            content = ''.join( [content,  b'\x00'* ( self.output_size-len(content)) ])
+        if len(content) < self.output_size:
+            content.extend( [0] * ( self.output_size - len(content) ) )
+        elif len(content)  > self.output_size :
+            content = content[0:self.output_size ]
 
         # transform
         content = struct.unpack('B'*len(content), content) ## it is a tuple, B means unsing
@@ -209,8 +210,8 @@ class Nmodel():
         '''
         inputs_data = np.ones( (1, self.input_size ,1) )
         labels_data = np.ones( (1, self.output_size ) )
-        
-        for i in xrange(size):
+        l.info("self.input_size is %d", self.input_size) 
+        for i in range(size):
             if train:
                 #l.info("gest index  %d", start_index+i )
                 input_path  = self.train_inputs_with_label[start_index +i][0]
@@ -291,10 +292,10 @@ class Nmodel():
         inputs_data,labels_data = self.read_samples_by_size(size , train = False)
         result = self.model.predict( inputs_data, batch_size =5, verbose=1)
       
-        for i in xrange(size):
+        for i in range(size):
             num=0
             a=list()
-            for index in xrange(len(labels_data[i])):
+            for index in range(len(labels_data[i])):
                 if labels_data[i][index] ==1:
                     num+=1
                     a.append(index)
@@ -304,7 +305,7 @@ class Nmodel():
                 num=0
                 b=list()
                 temp_result = self.turn_to_binary_value_by_ts(result[i], ts)
-                for index in xrange(len(temp_result)):
+                for index in range(len(temp_result)):
                     if temp_result[index] == 1:
                         num+=1
                         b.append(index)
@@ -383,7 +384,7 @@ class Nmodel():
 def start():
    
     binary =os.path.basename(binary_path)
-    afl_work_dir = os.path.join(cur_dir, "output-"+engine+'-'+binary )
+    afl_work_dir = os.path.join( "/tmp", "output-"+engine+'-'+binary )
     
     l.info("using the data from %s", engine)
     l.info("deal with the binary %s", binary)
@@ -420,13 +421,15 @@ def start():
     
     useful_index = collect.get_useful_index()
     nmodel.set_useful_index(useful_index)
-    l.info(useful_index)
+
+    # for test
+    nmodel.read_samples_by_size(1)
 
     # train the model
     nmodel.train_model( )
 
-    #l.info("begin to predict")
-    #nmodel.predict()
+    l.info("begin to predict")
+    nmodel.predict()
 
     #l.info("begin to evalute")
     #evaluate_result = nmodel.evaluate()

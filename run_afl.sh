@@ -9,11 +9,11 @@ PWD=`pwd`
 
 if [ "$Engine"x = "afl"x ]; then
 	AFL_HOME=$PWD/afl # afl
-	OUTPUT=$PWD/output-afl-$Target
+	OUTPUT=/tmp/output-afl-$Target
 	echo "using afl"
 elif [ "$Engine"x = "fair"x ]; then
 	AFL_HOME=$PWD/afl-rb #aflnb
-	OUTPUT=$PWD/output-fair-$Target
+	OUTPUT=/tmp/output-fair-$Target
 	echo "using aflnb"
 else
     echo "enging wrong"
@@ -23,4 +23,4 @@ fi
 rm -rf $OUTPUT
 mkdir -p $OUTPUT
 
-$AFL_HOME/afl-fuzz -i $PWD/seed -o $OUTPUT  ./benchmark/$Target @@
+$AFL_HOME/afl-fuzz -i $PWD/seed -o $OUTPUT  ./benchmark/$Target 
