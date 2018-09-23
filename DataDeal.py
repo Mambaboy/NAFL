@@ -170,8 +170,7 @@ class Collect():
 
         #transform to tuple
         self.useful_index = tuple(useful_index)
-
-        l.info("usefull indes has %d length", len(self.useful_index))
+        #l.info("usefull indes has %d length", len(self.useful_index))
     
     def get_useful_index(self):
         return self.useful_index

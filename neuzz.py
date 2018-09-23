@@ -1,9 +1,9 @@
-
 #coding=utf-8
 import coloredlogs
 import logging
 from DataDeal import *
 import struct
+from collections import OrderedDict
 
 import keras
 from keras.utils import plot_model
@@ -26,20 +26,24 @@ l.setLevel("INFO")
 fmt = "%(asctime)-15s %(filename)s:%(lineno)d %(process)d %(levelname)s %(message)s"
 coloredlogs.install(fmt=fmt)
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
+
 #cur_dir = os.path.abspath(os.path.dirname(__file__))
 cur_dir= '/home/xiaosatianyu/workspace/git/fuzz/NAFL'
-import os
+
 
 #for model
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
-epochs = 7
-batch_size = 32
-use_rate = 1
+batch_size = 50
 valid_rate=0.25
-test_rate =0
-use_old_model=True # load model from file
+test_rate =0.25
+
+use_old_model=False # load model from file
+use_rate = 1
+epochs = 5
 
 #for collect
 engine = "fair" 
@@ -47,15 +51,15 @@ engine = "fair"
 binary_path =  os.path.join(cur_dir, "benchmark/jhead-nb")
 ignore_ts = 10  # if the number of samples for one class is smaller than it, ignore
 from_file = True  # data infor from
-reduce_use_old = False
-l.info("using the data from %s", engine)
+reduce_use_old = True
 
 
 class Nmodel():
-    def __init__(self, input_size, output_size, strides=1, batch_size=200, epochs=50, use_rate=1, valid_rate=0.25, use_old_model  =False):
+    def __init__(self, input_size, output_size,binary, strides=1, batch_size=200, epochs=50, use_rate=1, valid_rate=0.25, use_old_model=False):
         
         self.input_size  =  input_size 
         self.output_size = output_size 
+        self.binary = binary
 
         self.strides     = strides 
         self.epochs      = epochs
@@ -75,21 +79,21 @@ class Nmodel():
         self.test_sample_number = 0  
 
         self.model       = Sequential()
-        self.model_file_path =  os.path.join(cur_dir,"neuzz.h5")
+        self.model_file_path =  os.path.join(cur_dir, self.binary+"-model.h5")
 
         self.useful_index = None
 
     def set_useful_index(self, useful_index):
-        self.useful_index = useful_index
+        self.useful_index = np.array(useful_index)
 
     def create_model(self):
-        self.model.add( Conv1D(64, 9, strides=self.strides,  padding="same", input_shape=(self.input_size, 1) ) )
+        self.model.add( Conv1D(32, 9, strides=self.strides,  padding="same", input_shape=(self.input_size, 1) ) )
         self.model.add( Activation("relu",name="relu1") )
        
-        self.model.add( Conv1D(64*2, 9, strides=self.strides,  padding="same") ) 
+        self.model.add( Conv1D(32*2, 9, strides=self.strides,  padding="same") ) 
         self.model.add( Activation("relu",name="relu2") )
 
-        self.model.add( Conv1D(64*2*2, 9, activation='relu', strides= self.strides, padding="same") )
+        self.model.add( Conv1D(32*2*2, 9, activation='relu', strides= self.strides, padding="same") )
         self.model.add( Activation("relu",name="relu3") )
 
         self.model.add( Dropout(0.25) )
@@ -108,7 +112,7 @@ class Nmodel():
         self.model.compile(loss='binary_crossentropy', optimizer='rmsprop', metrics=['accuracy'])  
 
     def get_model_net(self):
-        l.info(self.model.summary())
+        self.model.summary()
     
     def save_model(self):
         if os.path.exists(self.model_file_path):
@@ -327,69 +331,96 @@ class Nmodel():
         dst=io.imshow(temp)
         io.show()
 
+    @staticmethod
+    def get_index_max_value( result):
+        '''
+        get the index for the k max value
+        '''
+        key_locations = OrderedDict()
+        temp_result = np.copy(result)
+        for i in xrange(30):
+            max_value = np.max(temp_result)
+            if max_value == 0:
+                continue
+            indexs = np.where( temp_result == max_value)
+            #l.info("get the max value %s at %s", max_value, indexs)
+            key_locations[max_value] = indexs
+            temp_result[indexs] =0
+            #l.info("now it is %s",  temp_result)
 
-    def saliency(self, input_path, output_index):
-        l.info("calculate for the %d transition for %s", self.useful_index[output_index], input_path)
-        input_content = self._read_input_content(input_path)
-        
+        #l.info(key_locations)
+        for k, v in key_locations.items():
+                print k, v
+
+    def saliency(self, input_path, branch_id):
+        if os.path.exists(input_path):
+            l.info("grads for the %d transition for %s", branch_id, input_path)
+            input_content = self._read_input_content(input_path)
+            input_content = np.reshape(input_content,  (1, len(input_content), 1) )
+        else:
+            l.info("there is not %s, use one sample", input_path)
+            input_content, _ = self.read_samples_by_size(1)
+
+        output_index = np.where(self.useful_index == branch_id)
+        if len(output_index[0]) == 0:
+            l.warn("%s do not meet transition of %d", input_path, branch_id)
+            return None
+
         layer_idx = utils.find_layer_idx(self.model, 'sigmoid')
         # Swap sigmoid with linear
         self.model.layers[layer_idx].activation = activations.linear
         model = utils.apply_modifications(self.model)
 
         #saliency
-        result = visualize_saliency(model, layer_idx=layer_idx,  filter_indices=[output_index] , seed_input = input_content,
-                                    backprop_modifier=None ,  grad_modifier="absolute")
+        result = visualize_saliency(model, layer_idx=layer_idx, filter_indices=output_index[0], seed_input = input_content, backprop_modifier=None,  grad_modifier="absolute")
 
         #plot the result
-        #self.plot_saliency(result) 
-        l.info(result)
-       
+        self.plot_saliency(result) 
+        
+        #l.info(result)
+        return result
         
 def start():
-    
+   
     binary =os.path.basename(binary_path)
     afl_work_dir = os.path.join(cur_dir, "output-"+engine+'-'+binary )
     
-    # init the collect 
+    l.info("using the data from %s", engine)
+    l.info("deal with the binary %s", binary)
+
+    # 0.init the collect 
     collect = Collect( afl_work_dir = afl_work_dir, binary_path = binary_path, ignore_ts =ignore_ts, 
                          from_file = from_file, engine = engine, reduce_use_old =False)
 
+    # 1.
     reduce_output_size = collect.get_length_reduce_bitmap()
     l.info("the length of reduce bitmap is %d", reduce_output_size)
-    
     output_size =reduce_output_size
     if output_size > max_output_size:
         output_size = max_output_size
         l.info("use the max output_size of %d", max_output_size)
-
-    l.info("use the output_size of %d", output_size)
-
+    l.info("at last, use the output_size of %d", output_size)
      
-    #1. collect the path of each input
-    l.info("begine to collect the data from %s", engine)
+    # 2. collect the path of each input
     l.info("the ignore ts is %d", ignore_ts)
+    l.info("begine to collect the data from %s", engine)
     collect.collect_by_path()
 
-    #2.init the model
-    nmodel = Nmodel( input_size = max_input_size, output_size = output_size, 
+    # 3.init the model
+    nmodel = Nmodel( input_size = max_input_size, output_size = output_size, binary=binary,
                     strides = strides, epochs = epochs, batch_size = batch_size ,
                     use_rate =use_rate, valid_rate=valid_rate, use_old_model =use_old_model )
 
     nmodel.create_model()
-    nmodel.get_model_net()
-    #exit(0)    
+    #nmodel.get_model_net()
     
-    #3. read the content of each input
+    # 4. send data to the model
     all_inputs_with_label = collect.get_data()
     nmodel.set_all_data( all_inputs_with_label)
     
     useful_index = collect.get_useful_index()
     nmodel.set_useful_index(useful_index)
-
-    # for test
-    #nmodel.read_samples_by_size(10)
-    #exit(0)
+    l.info(useful_index)
 
     # train the model
     nmodel.train_model( )
@@ -400,9 +431,10 @@ def start():
     #l.info("begin to evalute")
     #evaluate_result = nmodel.evaluate()
 
-    check_input_path= None
-    nmodel.saliency(check_input_path, i)
-
+    check_input_path= "/tmp/afl-nb/jhead/queue/id:000091,src:000026+000028,op:splice,rep:8,+cov"
+    result = nmodel.saliency(check_input_path, 10577 )
+    if not result is None:
+        nmodel.get_index_max_value(result)
 
 def main():
     start(  )
