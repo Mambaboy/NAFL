@@ -90,8 +90,8 @@ class Collect():
             check_content=f.read()
         
         # for check
-        for index in xrange(len(self.useful_index)):
-            if reduce_bitmap_content[index] == struct.unpack('B',check_content[index])[0]:
+        for index in range(len(self.useful_index)):
+            if reduce_bitmap_content[index] == check_content[index]:
                 continue
             else:
                 l.info("there is some wrong")
@@ -103,7 +103,7 @@ class Collect():
     @staticmethod
     def sum_non_values_in_content( content, value):
         num =0
-        for index in xrange( len(content) ):
+        for index in range( len(content) ):
             if content[index] != value:
                 num+=1
         return num
@@ -164,8 +164,8 @@ class Collect():
 
         #collect the usefull index
         useful_index=list()
-        for index in xrange( len(content) ):
-            if not content[index] == '\xff':
+        for index in range( len(content) ):
+            if not content[index] == 255:
                 useful_index.append(index)
 
         #transform to tuple
