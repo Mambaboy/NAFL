@@ -30,29 +30,26 @@ coloredlogs.install(fmt=fmt)
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
 cur_dir = os.path.abspath(os.path.dirname(__file__))
+
 #for model
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
 batch_size = 50
-epochs = 1
-use_rate = 0.005
+epochs = 30
+use_rate = 1
 valid_rate=0.25
 test_rate =0.25
-
 use_old_model=False # load model from file
-use_rate = 1
-epochs = 5
 
 #for collect
 #engine = "fair" 
 engine ="afl"
 binary_path =  os.path.join(cur_dir, "benchmark/jhead-nb")
 ignore_ts = 10  # if the number of samples for one class is smaller than it, ignore
-from_file = True  # data infor from
-reduce_use_old = True
+from_file = False  # data infor from
+reduce_use_old = False
 l.info("using the data from %s", engine)
-
 
 class Nmodel():
     def __init__(self, input_size, output_size,binary, strides=1, batch_size=200, epochs=50, use_rate=1, valid_rate=0.25, use_old_model=False):
@@ -210,7 +207,7 @@ class Nmodel():
         '''
         inputs_data = np.ones( (1, self.input_size ,1) )
         labels_data = np.ones( (1, self.output_size ) )
-        l.info("self.input_size is %d", self.input_size) 
+        #l.info("self.input_size is %d", self.input_size) 
         for i in range(size):
             if train:
                 #l.info("gest index  %d", start_index+i )
@@ -351,7 +348,7 @@ class Nmodel():
 
         #l.info(key_locations)
         for k, v in key_locations.items():
-                print k, v
+                print( k, v)
 
     def saliency(self, input_path, branch_id):
         if os.path.exists(input_path):
@@ -434,10 +431,10 @@ def start():
     #l.info("begin to evalute")
     #evaluate_result = nmodel.evaluate()
 
-    check_input_path= "/tmp/afl-nb/jhead/queue/id:000091,src:000026+000028,op:splice,rep:8,+cov"
-    result = nmodel.saliency(check_input_path, 10577 )
-    if not result is None:
-        nmodel.get_index_max_value(result)
+    #check_input_path= "/tmp/afl-nb/jhead/queue/id:000091,src:000026+000028,op:splice,rep:8,+cov"
+    #result = nmodel.saliency(check_input_path, 10577 )
+    #if not result is None:
+    #    nmodel.get_index_max_value(result)
 
 def main():
     start(  )
