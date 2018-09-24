@@ -36,7 +36,7 @@ max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
 batch_size = 500
-epochs = 3
+epochs = 10
 use_rate = 1
 valid_rate=0.25
 test_rate =0.25
@@ -84,13 +84,13 @@ class Nmodel():
         self.useful_index = np.array(useful_index)
 
     def create_model(self):
-        self.model.add( Conv1D(32, 9, strides=self.strides,  padding="same", input_shape=(self.input_size, 1) ) )
+        self.model.add( Conv1D(64, 9, strides=self.strides,  padding="same", input_shape=(self.input_size, 1) ) )
         self.model.add( Activation("relu",name="relu1") )
        
-        self.model.add( Conv1D(32*2, 9, strides=self.strides,  padding="same") ) 
+        self.model.add( Conv1D(64*2, 9, strides=self.strides,  padding="same") ) 
         self.model.add( Activation("relu",name="relu2") )
 
-        self.model.add( Conv1D(32*2*2, 9, activation='relu', strides= self.strides, padding="same") )
+        self.model.add( Conv1D(64*2*2, 9, activation='relu', strides= self.strides, padding="same") )
         self.model.add( Activation("relu",name="relu3") )
 
         self.model.add( Dropout(0.25) )
@@ -185,6 +185,7 @@ class Nmodel():
         content = f.read()
         f.close()
         
+        content = bytearray(content)
         # control the length
         if len(content) < self.output_size:
             content.extend( [0] * ( self.output_size - len(content) ) )
@@ -380,7 +381,7 @@ class Nmodel():
 def start():
    
     binary =os.path.basename(binary_path)
-    afl_work_dir = os.path.join( "/tmp", "output-"+engine+'-'+binary )
+    afl_work_dir = os.path.join( cur_dir, "output-"+engine+'-'+binary )
     
     l.info("using the data from %s", engine)
     l.info("deal with the binary %s", binary)
@@ -424,16 +425,16 @@ def start():
     # train the model
     nmodel.train_model( )
 
-    l.info("begin to predict")
-    nmodel.predict()
+    #l.info("begin to predict")
+    #nmodel.predict()
 
     #l.info("begin to evalute")
     #evaluate_result = nmodel.evaluate()
 
-    #check_input_path= "/tmp/afl-nb/jhead/queue/id:000091,src:000026+000028,op:splice,rep:8,+cov"
-    #result = nmodel.saliency(check_input_path, 10577 )
-    #if not result is None:
-    #    nmodel.get_index_max_value(result)
+    check_input_path= "/home/xiaosatianyu/NAFL/output-afl-jhead-nb/queue/id:000000,orig:not_kitty.jpg"
+    result = nmodel.saliency(check_input_path, 10577 )
+    if not result is None:
+        nmodel.get_index_max_value(result)
 
 def main():
     start(  )
