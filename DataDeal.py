@@ -91,7 +91,7 @@ class Collect():
         
         # for check
         for index in range(len(self.useful_index)):
-            if reduce_bitmap_content[index] == check_content[index]:
+            if  check_content[index] == content[self.useful_index[index]]:
                 continue
             else:
                 l.info("there is some wrong")
@@ -126,17 +126,18 @@ class Collect():
             bitmap_path = path.get_bitmap_path()
 
             #reduce the trace bitmap
-            reduce_bitmap_path = self.reduce_trace_bitmap(bitmap_path)
-
-            if not reduce_bitmap_path is None and os.path.exists(reduce_bitmap_path):  
-                for sole_input in input_paths:
-                    self.all_inputs_with_label.append( (sole_input, reduce_bitmap_path) )
+            if len(input_paths) > 0:
+                reduce_bitmap_path = self.reduce_trace_bitmap(bitmap_path)
             else:
-                l.info("reduce bitmap fail for %s", bitmap_path)
+                reduce_bitmap_path = None
+            for sole_input in input_paths:
+                if not reduce_bitmap_path is None and os.path.exists(reduce_bitmap_path):  
+                    self.all_inputs_with_label.append( (sole_input, reduce_bitmap_path) )
+                else:
+                    l.info("reduce bitmap fail for %s", bitmap_path)
 
             # save the input number for each path
             self.path_num_dict.update({path_hash:path.inputs_num})
-
 
         # shuffle the list
         l.info("shuffle the inputs")

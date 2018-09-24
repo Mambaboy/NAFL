@@ -35,8 +35,8 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 3
-batch_size = 50
-epochs = 30
+batch_size = 500
+epochs = 3
 use_rate = 1
 valid_rate=0.25
 test_rate =0.25
@@ -47,8 +47,8 @@ use_old_model=False # load model from file
 engine ="afl"
 binary_path =  os.path.join(cur_dir, "benchmark/jhead-nb")
 ignore_ts = 10  # if the number of samples for one class is smaller than it, ignore
-from_file = False  # data infor from
-reduce_use_old = False
+from_file = True  # data infor from
+reduce_use_old = True
 l.info("using the data from %s", engine)
 
 class Nmodel():
@@ -153,14 +153,13 @@ class Nmodel():
         self.test_inputs_with_label = test_inputs_with_label[0: self.test_sample_number]
 
     def set_all_data(self , all_inputs_with_label):
-        
         l.info("use %f samples for speed", self.use_rate)
         self.all_inputs_with_label = all_inputs_with_label[0:int(len(all_inputs_with_label)*self.use_rate)]
         self.total_sample_number = len(self.all_inputs_with_label)
         
         # split the train data and test data
         self._split_data()
-
+    
     def _read_input_content(self, file):
         f = open(file, "rb")
         content = f.read()
@@ -388,9 +387,9 @@ def start():
 
     # 0.init the collect 
     collect = Collect( afl_work_dir = afl_work_dir, binary_path = binary_path, ignore_ts =ignore_ts, 
-                         from_file = from_file, engine = engine, reduce_use_old =False)
+                         from_file = from_file, engine = engine, reduce_use_old =reduce_use_old)
 
-    # 1.
+    # 1. get the size of output
     reduce_output_size = collect.get_length_reduce_bitmap()
     l.info("the length of reduce bitmap is %d", reduce_output_size)
     output_size =reduce_output_size
