@@ -34,13 +34,13 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 #for model
 max_input_size  = 400
 max_output_size = 6000  # this is the max
-strides = 3
+strides = 2
 batch_size = 500
 epochs = 10
 use_rate = 1
 valid_rate=0.25
 test_rate =0.25
-use_old_model=False # load model from file
+use_old_model=True # load model from file
 
 #for collect
 #engine = "fair" 
@@ -285,7 +285,7 @@ class Nmodel():
         result = self.model.evaluate(inputs_data, labels_data, verbose =1)
         return result
 
-    def predict(self, size =30):
+    def predict(self, size =10):
         inputs_data,labels_data = self.read_samples_by_size(size , train = False)
         result = self.model.predict( inputs_data, batch_size =5, verbose=1)
       
@@ -298,7 +298,7 @@ class Nmodel():
                     a.append(index)
             l.info("there is %d number 1 in the label", num)
             #l.info(a)
-            for ts in [0.5]:
+            for ts in [0.3,0.4,0.5,0.7,0.8,0.9,0.95]:
                 num=0
                 b=list()
                 temp_result = self.turn_to_binary_value_by_ts(result[i], ts)
@@ -410,7 +410,7 @@ def start():
                     use_rate =use_rate, valid_rate=valid_rate, use_old_model =use_old_model )
 
     nmodel.create_model()
-    #nmodel.get_model_net()
+    nmodel.get_model_net()
     
     # 4. send data to the model
     all_inputs_with_label = collect.get_data()
@@ -425,11 +425,11 @@ def start():
     # train the model
     nmodel.train_model( )
 
-    #l.info("begin to predict")
-    #nmodel.predict()
+    l.info("begin to predict")
+    nmodel.predict()
 
-    #l.info("begin to evalute")
-    #evaluate_result = nmodel.evaluate()
+    l.info("begin to evalute")
+    evaluate_result = nmodel.evaluate()
 
     check_input_path= "/home/xiaosatianyu/NAFL/output-afl-jhead-nb/queue/id:000000,orig:not_kitty.jpg"
     result = nmodel.saliency(check_input_path, 10577 )
