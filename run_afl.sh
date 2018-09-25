@@ -14,7 +14,11 @@ if [ "$Engine"x = "afl"x ]; then
 elif [ "$Engine"x = "fair"x ]; then
 	AFL_HOME=$PWD/afl-rb #aflnb
 	OUTPUT=/tmp/output-fair-$Target
-	echo "using aflnb"
+	echo "using fair"
+elif [ "$Engine"x = "orig"x ]; then
+	AFL_HOME=$PWD/afl-orig #aflnb
+	OUTPUT=/tmp/output-orig-$Target
+	echo "using orig"
 else
     echo "enging wrong"
     exit
