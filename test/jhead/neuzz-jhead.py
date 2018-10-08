@@ -1,7 +1,7 @@
 #coding=utf-8
 import coloredlogs
 import logging
-from DataDeal import *
+from datadeal import *
 import struct
 from collections import OrderedDict
 import os
@@ -35,21 +35,20 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 max_input_size  = 400
 max_output_size = 6000  # this is the max
 strides = 2
-batch_size = 500
-epochs = 10
+batch_size = 100
+epochs = 5
 use_rate = 1
 valid_rate=0.25
 test_rate =0.25
-use_old_model=True # load model from file
+use_old_model=False # load model from file
 
 #for collect
 #engine = "fair" 
 engine ="afl"
-binary_path =  os.path.join(cur_dir, "benchmark/jhead-nb")
+binary =  "jhead-nb"
 ignore_ts = 10  # if the number of samples for one class is smaller than it, ignore
 from_file = True  # data infor from
 reduce_use_old = True
-l.info("using the data from %s", engine)
 
 class Nmodel():
     def __init__(self, input_size, output_size,binary, strides=1, batch_size=200, epochs=50, use_rate=1, valid_rate=0.25, use_old_model=False):
@@ -380,14 +379,13 @@ class Nmodel():
         
 def start():
    
-    binary =os.path.basename(binary_path)
-    afl_work_dir = os.path.join( cur_dir, "output-"+engine+'-'+binary )
+    afl_work_dir = os.path.join( "/tmp", "output-"+engine+'-'+binary )
     
     l.info("using the data from %s", engine)
     l.info("deal with the binary %s", binary)
 
     # 0.init the collect 
-    collect = Collect( afl_work_dir = afl_work_dir, binary_path = binary_path, ignore_ts =ignore_ts, 
+    collect = Collect( afl_work_dir = afl_work_dir, binary = binary, ignore_ts =ignore_ts, 
                          from_file = from_file, engine = engine, reduce_use_old =reduce_use_old)
 
     # 1. get the size of output

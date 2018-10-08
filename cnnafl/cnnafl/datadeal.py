@@ -26,7 +26,7 @@ the default of trace bits if 0 for each byte
 '''
 
 class Collect():
-    def __init__(self, afl_work_dir, binary_path, ignore_ts, engine, from_file=False, reduce_use_old=False):
+    def __init__(self, afl_work_dir, binary, ignore_ts, engine, from_file=False, reduce_use_old=False):
         '''
         ignore_ts: ignore threshold, if the smaple number less than it, ignore
         '''
@@ -37,8 +37,7 @@ class Collect():
         
         self.ignore_ts      =ignore_ts
         
-        self.binary_path    = binary_path
-        self.binary         = os.path.basename(binary_path)
+        self.binary         = binary
         
         self.path_num_dict      = dict() #key is the hash of path, value is the samples of this path
         self.total_path_num       = 0
@@ -112,6 +111,7 @@ class Collect():
         if self.from_file: 
             if self.load_from_json():
                 l.info("load from file")
+                l.info("collect %d inputs with their bitmap!", len(self.all_inputs_with_label) )
                 return
         l.info("begin to collect the input, wait for some time")
         l.info("reduce the bitmap")
@@ -244,12 +244,11 @@ class Path():
 def main():
     engine="afl"
     l.info("using the data from %s", engine)
-
-    binary_path =  os.path.join(cur_dir, "benchmark/test")
-    binary = os.path.basename(binary_path)
+    
+    binary = "test"
     afl_work_dir = os.path.join(cur_dir, "output-"+engine+'-'+binary)
     
-    collect = Collect(afl_work_dir, binary_path, ignore_ts=30, engine=engine, from_file =False, reduce_use_old =False)
+    collect = Collect(afl_work_dir, binary, ignore_ts=30, engine=engine, from_file =False, reduce_use_old =False)
 
     #1. collect the path of each input
     collect.collect_by_path()

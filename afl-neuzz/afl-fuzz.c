@@ -2526,7 +2526,7 @@ static void write_to_DATA(void* mem, u32 len ) {
   // path hash 
   u8 * trace_mini = ck_alloc(MAP_SIZE >> 3);
   minimize_bits(trace_mini, trace_bits);
-  u32 path_hash=hash32(trace_mini, MAP_SIZE>>3, HASH_CONST);
+  u32 path_hash = hash32(trace_mini, MAP_SIZE>>3, HASH_CONST);
   ck_free(trace_mini);
   //u32 path_hash = hash32(trace_bits, MAP_SIZE, HASH_CONST);
   
