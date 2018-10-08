@@ -2519,7 +2519,7 @@ u32 filecnt(u8* filename)
 static void write_to_DATA(void* mem, u32 len ) {
 
   s32 fd;
-  u32 tc_hash=hash32(mem, len, HASH_CONST); // mem is the trace_bit for each input
+  u32 tc_hash = hash32(mem, len, HASH_CONST); // mem is the trace_bit for each input
   u8 * dir;
   u8 * file;
  

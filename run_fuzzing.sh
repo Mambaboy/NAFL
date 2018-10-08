@@ -8,7 +8,7 @@ Engine=$1
 PWD=`pwd`
 
 if [ "$Engine"x = "afl"x ]; then
-	AFL_HOME=$PWD/afl # afl
+	AFL_HOME=$PWD/afl-neuzz # afl
 	OUTPUT=/tmp/output-afl-$Target
 	echo "using afl"
 elif [ "$Engine"x = "fair"x ]; then
