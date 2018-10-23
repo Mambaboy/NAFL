@@ -124,6 +124,8 @@ ORIG_CPU_TARGET="$CPU_TARGET"
 test "$CPU_TARGET" = "" && CPU_TARGET="`uname -m`"
 test "$CPU_TARGET" = "i686" && CPU_TARGET="i386"
 
+CPU_TARGET="i386"
+
 cd qemu-$VERSION || exit 1
 
 echo "[*] Applying patches..."
