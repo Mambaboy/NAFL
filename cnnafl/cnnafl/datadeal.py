@@ -46,6 +46,8 @@ class Collect():
         self.engine    =  engine
         self.json_file_path = engine+"-"+ self.binary+"-" +"data.json"
 
+        self.input_max_length = 0;
+
         # all inputs it is huge 
         self.all_inputs_with_label = list() #each element is a tuple, which is the inputs and bitmap paths
 
@@ -124,6 +126,10 @@ class Collect():
             path = Path(path_hash, sole_data_dir, self.ignore_ts)
             input_paths = path.get_input_paths()
             bitmap_path = path.get_bitmap_path()
+
+            # set the max input length
+            if path.input_max_length > self.input_max_length:
+                self.input_max_length= path.input_max_length
 
             #reduce the trace bitmap
             if len(input_paths) > 0:
@@ -217,6 +223,9 @@ class Path():
         
         self.bitmap_path  = os.path.join(path_data_dir, "trace-%s"%(bitmap_hash) ) # the ab path of the bitmap
 
+        self.input_max_length = 0
+        
+        #collect the info
         self.input_paths=set() #save all the inputs  absolute path
         self._get_input_paths()
         self.inputs_num   = len(self.input_paths) ## maybe 0
@@ -232,6 +241,11 @@ class Path():
                 continue
             input_path = os.path.join(self.path_data_dir, item)
             self.input_paths.add(input_path)
+            
+            # set the input length
+            input_length = os.path.getsize(input_path) 
+            if input_length > self.input_max_length:
+                self.input_max_length=input_length;
 
     def get_input_paths(self):
         return self.input_paths
