@@ -46,7 +46,8 @@ class Collect():
         self.engine    =  engine
         self.json_file_path = engine+"-"+ self.binary+"-" +"data.json"
 
-        self.input_max_length = 0;
+        self.input_mean_length = 0
+        self.kind_num = 0
 
         # all inputs it is huge 
         self.all_inputs_with_label = list() #each element is a tuple, which is the inputs and bitmap paths
@@ -117,7 +118,11 @@ class Collect():
                 return
         l.info("begin to collect the input, wait for some time")
         l.info("reduce the bitmap")
-        
+       
+        # collect the mean length in each kind
+        kind_total_length=0
+        kind_num=0
+
         for path_hash in os.listdir(self.all_data_dir):
             
             sole_data_dir = os.path.join(self.all_data_dir, path_hash)
@@ -126,10 +131,6 @@ class Collect():
             path = Path(path_hash, sole_data_dir, self.ignore_ts)
             input_paths = path.get_input_paths()
             bitmap_path = path.get_bitmap_path()
-
-            # set the max input length
-            if path.input_max_length > self.input_max_length:
-                self.input_max_length= path.input_max_length
 
             #reduce the trace bitmap
             if len(input_paths) > 0:
@@ -141,9 +142,16 @@ class Collect():
                     self.all_inputs_with_label.append( (sole_input, reduce_bitmap_path) )
                 else:
                     l.info("reduce bitmap fail for %s", bitmap_path)
+            
+            # collect the mean input length for each kind
+            kind_total_length+=path.input_mean_length
+            self.kind_num+=1
 
             # save the input number for each path
             self.path_num_dict.update({path_hash:path.inputs_num})
+       
+        # set the total input mean length
+        self.input_mean_length =int( kind_total_length/self.kind_num)+1
 
         # shuffle the list
         l.info("shuffle the inputs")
@@ -223,12 +231,13 @@ class Path():
         
         self.bitmap_path  = os.path.join(path_data_dir, "trace-%s"%(bitmap_hash) ) # the ab path of the bitmap
 
-        self.input_max_length = 0
+        self.input_total_length = 0
+        self.inputs_num = 0 
+        self.input_mean_length = 0
         
         #collect the info
         self.input_paths=set() #save all the inputs  absolute path
         self._get_input_paths()
-        self.inputs_num   = len(self.input_paths) ## maybe 0
         
     def _get_input_paths(self):
         if not self.ignore_ts is None:
@@ -242,10 +251,14 @@ class Path():
             input_path = os.path.join(self.path_data_dir, item)
             self.input_paths.add(input_path)
             
-            # set the input length
+            # collect the input length
             input_length = os.path.getsize(input_path) 
-            if input_length > self.input_max_length:
-                self.input_max_length=input_length;
+            self.input_total_length+=input_length
+            self.inputs_num+=1
+        
+        #set the mean input length
+        self.input_mean_length = int(self.input_total_length/ self.inputs_num)+1
+
 
     def get_input_paths(self):
         return self.input_paths

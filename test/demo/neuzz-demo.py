@@ -34,21 +34,21 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 #for model
 max_input_size  = 1000
 max_output_size = 6000  # this is the max
-strides = 3
-batch_size = 100
-epochs = 10
+strides = 3 
+batch_size = 400
+epochs = 50
 use_rate = 1
 valid_rate=0.25
 test_rate =0.25
-use_old_model=True # load model from file
+use_old_model=False # load model from file
 
 #for collect
 #engine = "fair" 
 engine ="fair"
-binary =  "demo"
-ignore_ts = 10  # if the number of samples for one class is smaller than it, ignore
-from_file = True # data infor from
-reduce_use_old = True
+binary =  "demo_nb"
+ignore_ts = 100  # if the number of samples for one class is smaller than it, ignore
+from_file = False # data infor from
+reduce_use_old = False
 
 class Nmodel():
     def __init__(self, input_size, output_size,binary, strides=1, batch_size=200, epochs=50, use_rate=1, valid_rate=0.25, use_old_model=False):
@@ -83,19 +83,20 @@ class Nmodel():
         self.useful_index = np.array(useful_index)
 
     def create_model(self):
-        self.model.add( Conv1D(64, 9, strides=self.strides,  padding="same", input_shape=(self.input_size, 1) ) )
+        # 64 个输出通道，卷积大小9
+        self.model.add( Conv1D(128, 9, strides=self.strides,  padding="same", input_shape=(self.input_size, 1) ) )
         self.model.add( Activation("relu",name="relu1") )
        
-        self.model.add( Conv1D(64*2, 9, strides=self.strides,  padding="same") ) 
+        self.model.add( Conv1D(128*2, 9, strides=self.strides,  padding="same") ) 
         self.model.add( Activation("relu",name="relu2") )
 
-        self.model.add( Conv1D(64*2*2, 9, activation='relu', strides= self.strides, padding="same") )
+        self.model.add( Conv1D(128*2*2, 9, activation='relu', strides= self.strides, padding="same") )
         self.model.add( Activation("relu",name="relu3") )
-
-        self.model.add( Dropout(0.25) )
 
         self.model.add( Flatten() )
         
+        self.model.add( Dropout(0.25) )
+
         self.model.add( Dense(self.output_size*2, activation='relu', name="full_connect_layer1") )
         
         self.model.add(Dropout(0.25))
@@ -130,6 +131,7 @@ class Nmodel():
         self.model.fit_generator( self.generator_train_data_by_batch(), 
                                   steps_per_epoch = self.train_sample_number/self.batch_size, 
                                   epochs = self.epochs, verbose=1,
+                                  use_multiprocessing=True,
                                   validation_data = self.generator_test_data_by_batch(),
                                   validation_steps = self.test_sample_number/self.batch_size )
         # save the model
@@ -338,7 +340,8 @@ class Nmodel():
         for i in range(10):
             max_value = np.max(temp_result)
             if max_value == 0:
-                continue
+                l.info("the max gradient is o")
+                return
             indexs = np.where( temp_result == max_value)
             #l.info("get the max value %s at %s", max_value, indexs)
             key_locations[max_value] = indexs
@@ -363,47 +366,55 @@ class Nmodel():
             l.warn("%s do not meet transition of %d", input_path, branch_id)
             return None
 
-        layer_idx = utils.find_layer_idx(self.model, 'sigmoid')
+        layer_idx = utils.find_layer_idx(self.model, 'full_connect_layer2')
         # Swap sigmoid with linear
-        self.model.layers[layer_idx].activation = activations.linear
-        model = utils.apply_modifications(self.model)
+        #self.model.layers[layer_idx].activation = activations.linear
+        #model = utils.apply_modifications(self.model)
 
         #saliency
-        result = visualize_saliency(model, layer_idx=layer_idx, filter_indices=output_index[0], seed_input = input_content, backprop_modifier=None,  grad_modifier="absolute")
+        result = visualize_saliency(self.model, layer_idx=layer_idx, filter_indices=output_index[0], seed_input = input_content, backprop_modifier=None,  grad_modifier="absolute")
 
         #plot the result
         #self.plot_saliency(result) 
         
         #l.info(result)
-        return result
+        return result * 255
         
 def start():
    
     afl_work_dir = os.path.join( "/tmp", "output-"+engine+'-'+binary )
     
     l.info("using the data from %s", engine)
-    l.info("deal with the binary %s", binary)
+    l.info("deal with the binary %s\n", binary)
 
     # 0.init the collect 
     collect = Collect( afl_work_dir = afl_work_dir, binary = binary, ignore_ts =ignore_ts, 
                          from_file = from_file, engine = engine, reduce_use_old =reduce_use_old)
-
+    #  collect the path of each input
+    l.info("the ignore ts is %d", ignore_ts)
+    l.info("begine to collect the data from %s", engine)
+    collect.collect_by_path()
+    
     # 1. get the size of output
+    l.info("\n")
     reduce_output_size = collect.get_length_reduce_bitmap()
     l.info("the length of reduce bitmap is %d", reduce_output_size)
     output_size =reduce_output_size
     if output_size > max_output_size:
         output_size = max_output_size
-        l.info("use the max output_size of %d", max_output_size)
-    l.info("at last, use the output_size of %d", output_size)
-     
-    # 2. collect the path of each input
-    l.info("the ignore ts is %d", ignore_ts)
-    l.info("begine to collect the data from %s", engine)
-    collect.collect_by_path()
+    l.info("at last, use the output_size of %d\n", output_size)
+    
+    # 1. get the size of output
+    input_size = collect.input_mean_length
+    l.info("the mean input size is %s", input_size)
+    if input_size==0:
+        input_size = max_input_size
+    if input_size > max_input_size:
+        input_size = max_input_size
+    l.info("at last, use the input_size of %d\n", input_size)
 
     # 3.init the model
-    nmodel = Nmodel( input_size = max_input_size, output_size = output_size, binary=binary,
+    nmodel = Nmodel( input_size = input_size, output_size = output_size, binary=binary,
                     strides = strides, epochs = epochs, batch_size = batch_size ,
                     use_rate =use_rate, valid_rate=valid_rate, use_old_model =use_old_model )
 
@@ -424,17 +435,20 @@ def start():
     nmodel.train_model( )
 
     l.info("begin to predict")
-    nmodel.predict()
+    #nmodel.predict()
 
     l.info("begin to evalute")
-    evaluate_result = nmodel.evaluate()
+    #evaluate_result = nmodel.evaluate()
 
-    check_input_path= "/tmp/output-afl-demo/queue/id:000010,src:000002,op:arith8,pos:2,val:-30,+cov"
-    result = nmodel.saliency(check_input_path, 5353 )
+
+
+    check_input_path= "/tmp/afl-nb/queue/id:000000,orig:seed"
+    check_input_path="/tmp/afl-nb/queue/id:000003,src:000002,op:arith8,pos:4,val:+9,+cov"
+    result = nmodel.saliency(check_input_path, 10327 )
     if not result is None:
         nmodel.get_index_max_value(result)
     
-    result = nmodel.saliency(check_input_path, 32514)
+    result = nmodel.saliency(check_input_path, 10282)
     if not result is None:
         nmodel.get_index_max_value(result)
 
