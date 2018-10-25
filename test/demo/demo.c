@@ -23,6 +23,7 @@ void test1 (char *buf) {
         raise(SIGSEGV);
 }
 
+
 void test2 (char *buf) {
 	if(buf[0] == 'b') 
 		if(buf[1] == 'a')
@@ -50,7 +51,7 @@ int main(int argc, char *argv[]) {
 	input = fopen(argv[1], "r");
 	if (input != 0) {
 		fread(&buf, 1,500, input);
-		test1(buf);
+		test2(buf);
 		fclose(input);
 	}
 	return 0;

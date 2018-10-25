@@ -3,7 +3,7 @@ if [ ! $# == 1 ]; then
     exit
 fi
 
-Target=demo
+Target=demo_nb
 Engine=$1
 PWD=`pwd`
 
@@ -27,4 +27,4 @@ fi
 rm -rf $OUTPUT
 mkdir -p $OUTPUT
 
-$AFL_HOME/afl-fuzz -i $PWD/seed -o $OUTPUT -Q -m 8G $PWD/$Target @@ 
+$AFL_HOME/afl-fuzz -i $PWD/seed -o $OUTPUT  $PWD/$Target @@ 
