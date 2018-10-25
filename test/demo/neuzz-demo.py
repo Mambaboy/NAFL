@@ -35,12 +35,12 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 max_input_size  = 1000
 max_output_size = 6000  # this is the max
 strides = 3 
-batch_size = 400
+batch_size = 800
 epochs = 50
 use_rate = 1
 valid_rate=0.25
 test_rate =0.25
-use_old_model=False # load model from file
+use_old_model=True # load model from file
 
 #for collect
 #engine = "fair" 
@@ -106,7 +106,7 @@ class Nmodel():
         self.model.add( Activation("sigmoid",name="sigmoid") )
 
         # the accuracy and optimizer
-        self.model.compile(loss='binary_crossentropy', optimizer='rmsprop', metrics=['accuracy'])  
+        self.model.compile(loss='binary_crossentropy', optimizer='adagrad', metrics=["mae",'accuracy'])  
 
     def get_model_net(self):
         self.model.summary()
@@ -119,7 +119,11 @@ class Nmodel():
 
     def load_model(self):
         self.model =load_model(self.model_file_path)
-        
+        self.input_size = self.model.input_shape[1]
+        l.info("using the input size of %s as the loaded model", self.input_size)
+        self.output_size = self.model.output_shape[1]
+        l.info("using the output size of %s as the loadedmodel", self.output_size)
+
     def train_model(self):
 
         if self.use_old_model and os.path.exists(self.model_file_path):
@@ -288,7 +292,7 @@ class Nmodel():
 
     def predict(self, size =10):
         inputs_data,labels_data = self.read_samples_by_size(size , train = False)
-        result = self.model.predict( inputs_data, batch_size =5, verbose=1)
+        result = self.model.predict( inputs_data, batch_size =1, verbose=1)
       
         for i in range(size):
             num=0
@@ -435,10 +439,10 @@ def start():
     nmodel.train_model( )
 
     l.info("begin to predict")
-    #nmodel.predict()
+    nmodel.predict()
 
     l.info("begin to evalute")
-    #evaluate_result = nmodel.evaluate()
+    evaluate_result = nmodel.evaluate()
 
 
 
