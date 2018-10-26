@@ -16,7 +16,11 @@ from keras.layers import Embedding
 from keras.layers import Conv1D, GlobalAveragePooling1D, MaxPooling1D 
 import numpy as np
 
+from keras import backend as K
+K.clear_session()
+
 from sklearn.model_selection import train_test_split
+
 from vis.visualization import visualize_saliency
 from vis.utils import utils
 
@@ -34,13 +38,13 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 #for model
 max_input_size  = 1000
 max_output_size = 6000  # this is the max
-strides = 3 
-batch_size = 800
+strides = 2 
+batch_size = 200
 epochs = 50
 use_rate = 1
 valid_rate=0.25
 test_rate =0.25
-use_old_model=True # load model from file
+use_old_model=False # load model from file
 
 #for collect
 #engine = "fair" 
@@ -49,6 +53,10 @@ binary =  "demo_nb"
 ignore_ts = 100  # if the number of samples for one class is smaller than it, ignore
 from_file = False # data infor from
 reduce_use_old = False
+
+if use_old_model==True:
+    from_file=True
+    reduce_use_old=True
 
 class Nmodel():
     def __init__(self, input_size, output_size,binary, strides=1, batch_size=200, epochs=50, use_rate=1, valid_rate=0.25, use_old_model=False):
@@ -289,7 +297,7 @@ class Nmodel():
         inputs_data,labels_data = self.read_samples_by_size(size , train = False)
         result = self.model.evaluate(inputs_data, labels_data, verbose =1)
         return result
-
+    
     def predict(self, size =10):
         inputs_data,labels_data = self.read_samples_by_size(size , train = False)
         result = self.model.predict( inputs_data, batch_size =1, verbose=1)
@@ -341,7 +349,7 @@ class Nmodel():
         '''
         key_locations = OrderedDict()
         temp_result = np.copy(result)
-        for i in range(10):
+        for i in range(20):
             max_value = np.max(temp_result)
             if max_value == 0:
                 l.info("the max gradient is o")
@@ -423,7 +431,7 @@ def start():
                     use_rate =use_rate, valid_rate=valid_rate, use_old_model =use_old_model )
 
     nmodel.create_model()
-    nmodel.get_model_net()
+    #nmodel.get_model_net()
     
     # 4. send data to the model
     all_inputs_with_label = collect.get_data()
@@ -439,7 +447,7 @@ def start():
     nmodel.train_model( )
 
     l.info("begin to predict")
-    nmodel.predict()
+    #nmodel.predict()
 
     l.info("begin to evalute")
     evaluate_result = nmodel.evaluate()
@@ -448,11 +456,12 @@ def start():
 
     check_input_path= "/tmp/afl-nb/queue/id:000000,orig:seed"
     check_input_path="/tmp/afl-nb/queue/id:000003,src:000002,op:arith8,pos:4,val:+9,+cov"
-    result = nmodel.saliency(check_input_path, 10327 )
+    check_input_path="/tmp/afl-nb/queue/id:000005,src:000004,op:havoc,rep:32,+cov"
+    result = nmodel.saliency(check_input_path, 4125 )
     if not result is None:
         nmodel.get_index_max_value(result)
     
-    result = nmodel.saliency(check_input_path, 10282)
+    result = nmodel.saliency(check_input_path, 41105)
     if not result is None:
         nmodel.get_index_max_value(result)
 
