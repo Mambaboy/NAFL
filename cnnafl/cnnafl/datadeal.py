@@ -32,7 +32,6 @@ class Collect():
         '''
         self.afl_work_dir   = afl_work_dir
         self.all_data_dir   = os.path.join(afl_work_dir, "data")
-
         self.total_bitmap_path   = os.path.join(afl_work_dir, "fuzz_bitmap")
         
         self.ignore_ts      =ignore_ts
@@ -137,6 +136,7 @@ class Collect():
                 reduce_bitmap_path = self.reduce_trace_bitmap(bitmap_path)
             else:
                 reduce_bitmap_path = None
+            
             for sole_input in input_paths:
                 if not reduce_bitmap_path is None and os.path.exists(reduce_bitmap_path):  
                     self.all_inputs_with_label.append( (sole_input, reduce_bitmap_path) )
@@ -144,14 +144,16 @@ class Collect():
                     l.info("reduce bitmap fail for %s", bitmap_path)
             
             # collect the mean input length for each kind
-            kind_total_length+=path.input_mean_length
-            self.kind_num+=1
+            if path.input_mean_length>0:
+                kind_total_length+=path.input_mean_length
+                self.kind_num+=1
 
             # save the input number for each path
             self.path_num_dict.update({path_hash:path.inputs_num})
        
         # set the total input mean length
         self.input_mean_length =int( kind_total_length/self.kind_num)+1
+        l.warn("collect form %d kinds path\n", self.kind_num)
 
         # shuffle the list
         l.info("shuffle the inputs")
