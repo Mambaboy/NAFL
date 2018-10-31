@@ -41,9 +41,9 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 max_input_size  = 1000
 max_output_size = 6000  # this is the max
 strides = 3 
-batch_size = 500
-epochs = 10
-use_rate = 1
+batch_size = 100
+epochs = 1
+use_rate = 0.1
 valid_rate=0.25
 test_rate =0.25
 use_old_model= False # load model from file
@@ -59,8 +59,8 @@ reduce_use_old = True
 if use_old_model==True:
     from_file=True
     reduce_use_old=True
-num=0
 from keras.utils import Sequence
+
 class SequenceData(Sequence):
     def __init__(self,  batch_size, input_size, output_size, inputs_with_label, tag):
         # 初始化所需的参数
@@ -68,21 +68,19 @@ class SequenceData(Sequence):
         self.input_size  = input_size
         self.output_size = output_size
         self.tag = tag
-        global num
-        num=num+1
-        self.num= num
         
         self.inputs_with_label = inputs_with_label
         if len(self.inputs_with_label) == 0:
             l.error("error inputs with label length")	
             exit()
-
+        self.steps= math.floor( len(self.inputs_with_label) / self.batch_size)
+        
         #cache
         self.bitmap_content_cache=dict()
 
     def __len__(self):
         # 让代码知道这个序列的长度
-        return math.floor( len(self.inputs_with_label) / self.batch_size)
+        return self.steps
 
     def __getitem__(self, idx):
         # 迭代器部分
@@ -90,7 +88,7 @@ class SequenceData(Sequence):
         x_arrays = np.array( [self.read_input_content(input_path) for input_path, bitmap_path in batch]).reshape(self.batch_size, self.input_size, 1).astype(np.float64)/255 
         y_arrays = (np.array( [self.read_label_content(bitmap_path) for input_path, bitmap_path in batch]) > 0).astype(np.int8) 
         #if "train" in self.tag:
-        #    l.info("%s:%d, get data from [%d, %d)",self.tag,self.num, idx*self.batch_size, (idx+1)*self.batch_size)
+        #    l.info("%s get data from [%d, %d)",self.tag, idx*self.batch_size, (idx+1)*self.batch_size)
         #l.info("the shape of x is %s", x_arrays.shape) 
         #l.info("the shape of y is %s", y_arrays.shape) 
         return x_arrays, y_arrays
@@ -140,14 +138,18 @@ class SequenceData(Sequence):
         return content
 
     #服务于生成器 
-    def read_samples_by_size(self, size=10 , start_index=0):
+    def read_samples_by_size(self,  start_index=0):
         '''
         start_index : fromt start_index to start_index+size
         '''
-        batch = self.inputs_with_label[start_index*self.batch_size: (start_index+1)*self.batch_size]
-        x_arrays = np.array( [self.read_input_content(input_path) for input_path, bitmap_path in batch]).reshape(self.batch_size, self.input_size, 1).astype(np.float64)/255 
-        y_arrays = (np.array( [self.read_label_content(bitmap_path) for input_path, bitmap_path in batch]) > 0).astype(np.int8) 
+        batch = self.inputs_with_label[start_index*self.batch_size: (start_index+1)*self.batch_size ]
+        try:
+            x_arrays = np.array( [self.read_input_content(input_path) for input_path, bitmap_path in batch]).reshape(self.batch_size, self.input_size, 1).astype(np.float64)/255 
+            y_arrays = (np.array( [self.read_label_content(bitmap_path) for input_path, bitmap_path in batch]) > 0).astype(np.int8) 
+        except:
 
+            l.info(x_arrays.shape)
+            l.info(y_arrays.shape)
         return (x_arrays, y_arrays)
    
     #生成器 
@@ -157,10 +159,11 @@ class SequenceData(Sequence):
         '''
         start_index = 0
         while True:
-            #start_index %= math.floor( len(self.inputs_with_label) / self.batch_size)
-            inputs_data, labels_data = self.read_samples_by_size( size = self.batch_size, start_index = start_index )
-            start_index += self.batch_size
-            #l.info("generator train data from [%d, to %d)", start_index, start_index + self.batch_size)
+            start_index %= self.steps
+            inputs_data, labels_data = self.read_samples_by_size(  start_index = start_index )
+            start_index += 1
+            #if "train" in self.tag:
+            #    l.info("train:generator train data from [%d, to %d)", start_index*self.batch_size, (start_index + 1)*self.batch_size)
             yield (inputs_data, labels_data)
 
    
@@ -253,14 +256,24 @@ class Nmodel():
 
         l.info("training the modle")
         l.info("the steps is %d", len(self.train_sequence))
+        self.model.fit_generator( self.train_sequence.generator_batch_data(), 
+                                  steps_per_epoch = len(self.train_sequence), 
+                                  epochs = self.epochs, verbose=1,
+                                  max_queue_size=5, # 每次最多生成的批次i
+                                  #workers=1,         # 工作者的数量
+                                  #use_multiprocessing=False,  # 是否启用多进程
+                                  validation_data = self.test_sequence.generator_batch_data(),
+                                  validation_steps = len(self.test_sequence) )
+        
         self.model.fit_generator( self.train_sequence, 
                                   steps_per_epoch = len(self.train_sequence), 
                                   epochs = self.epochs, verbose=1,
-                                  max_queue_size=1, # 每次最多生成的批次i
-                                  workers=3,         # 工作者的数量
+                                  #max_queue_size=10, # 每次最多生成的批次i
+                                  workers=5,         # 工作者的数量
                                   use_multiprocessing=True,  # 是否启用多进程
                                   validation_data = self.test_sequence,
                                   validation_steps = len(self.test_sequence) )
+        #
         # save the model
         self.save_model()
     
