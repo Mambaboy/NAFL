@@ -46,7 +46,7 @@ epochs = 20
 use_rate = 1
 valid_rate=0.25
 test_rate =0.25
-use_old_model= False # load model from file
+use_old_model= True # load model from file
 
 #for collect
 #engine = "fair" 
@@ -77,7 +77,7 @@ class SequenceData(Sequence):
         self.inputs_with_label = inputs_with_label
         if len(self.inputs_with_label) == 0:
             l.error("error inputs with label length")	
-            exit()
+        
         self.steps= math.floor( len(self.inputs_with_label) / self.batch_size)
         
         #cache
@@ -203,7 +203,8 @@ class Nmodel():
 
 
     def _set_useful_index_to_model(self, useful_index):
-        self.useful_index = np.array(useful_index)
+        #XX
+        self.useful_index = np.array( list(useful_index) )
 
     def _create_model(self):
         # 64 个输出通道，卷积大小9
@@ -239,12 +240,15 @@ class Nmodel():
         self.model.save(self.model_file_path)
         #plot_model(self.model, to_file='model.png')
 
-    def load_model(self):
+    def load_model(self , all_inputs_with_label):
         self.model =load_model(self.model_file_path)
         self.input_size = self.model.input_shape[1]
         l.info("using the input size of %s as the loaded model", self.input_size)
         self.output_size = self.model.output_shape[1]
         l.info("using the output size of %s as the loadedmodel", self.output_size)
+        
+        #XXX
+        self._set_data_to_model(all_inputs_with_label)
 
     def train_model(self, all_inputs_with_label, useful_index):
         # set the useful index 
@@ -253,12 +257,14 @@ class Nmodel():
         # load from  old model 
         if self.use_old_model and os.path.exists(self.model_file_path):
             l.info("load old model from file")
-            self.load_model()
+            self.load_model(all_inputs_with_label)
             return
         
         # set some  metadata to model
         self._set_data_to_model(all_inputs_with_label)
 
+
+        
         l.info("training the modle")
         l.info("the steps is %d", len(self.train_sequence))
        
@@ -392,11 +398,11 @@ class Nmodel():
     def saliency(self, input_path, branch_id):
         if os.path.exists(input_path):
             l.info("grads for the %d transition for %s", branch_id, input_path)
-            input_content = self.read_input_content(input_path)
-            input_content = np.reshape(input_content,  (1, len(input_content), 1) )
+            input_content = self.train_sequence.read_input_content(input_path)
+            input_content = np.array(input_content).reshape(1, self.input_size, 1).astype(np.float64)/255
         else:
             l.info("there is not %s, use one  other sample", input_path)
-            input_content, _ = self.read_samples_by_size(1)
+            return
 
         output_index = np.where(self.useful_index == branch_id)
         if len(output_index[0]) == 0:
@@ -470,13 +476,13 @@ def start():
 
     #l.info("begin to evalute")
     #evaluate_result = nmodel.evaluate()
-    return
-    check_input_path="/tmp/afl-nb/3D_Image_Toolkit/queue/id:000008,src:000000,op:havoc,rep:128"
-    result = nmodel.saliency(check_input_path, 21799 )
+    
+    check_input_path="/tmp/afl-nb/3D_Image_Toolkit/queue/id:000000,orig:seed"
+    result = nmodel.saliency(check_input_path, 61440 )
     if not result is None:
         nmodel.get_index_max_value(result)
     
-    result = nmodel.saliency(check_input_path, 57466)
+    result = nmodel.saliency(check_input_path, 32727)
     if not result is None:
         nmodel.get_index_max_value(result)
 

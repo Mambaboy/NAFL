@@ -194,16 +194,17 @@ class Collect():
                 useful_index.add(index)
         l.info("%d activated index", len(useful_index))
         # collect out the bilateral branches
-        copy_useful_index=useful_index.copy()
-        for index in copy_useful_index: 
-            if index in self.branch_info:
-                if not self.branch_info[index] in useful_index:
-                    useful_index.discard(index)
-                    l.info("In the Intresting %d is not a bilateral branch, remove it", index)
-                else:
-                    l.info("%d is a bilateral covered one",index)
-            else:
-                l.info("%d is activated but not in the branch info", index)
+        
+        #copy_useful_index=useful_index.copy()
+        #for index in copy_useful_index: 
+        #    if index in self.branch_info:
+        #        if not self.branch_info[index] in useful_index:
+        #            useful_index.discard(index)
+        #            l.info("In the Intresting %d is not a bilateral branch, remove it", index)
+        #        else:
+        #            l.info("%d is a bilateral covered one",index)
+        #    else:
+        #        l.info("%d is activated but not in the branch info", index)
 
         #transform to tuple
         self.useful_index = useful_index
