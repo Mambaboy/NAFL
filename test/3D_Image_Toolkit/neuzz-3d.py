@@ -25,8 +25,8 @@ from vis.utils import utils
 
 from skimage import io
 import time
-import cProfile
 import math
+import glob
 
 l=logging.getLogger("NEUZZ")
 l.setLevel("INFO") 
@@ -41,9 +41,9 @@ cur_dir = os.path.abspath(os.path.dirname(__file__))
 max_input_size  = 1000
 max_output_size = 6000  # this is the max
 strides = 3 
-batch_size = 100
-epochs = 1
-use_rate = 0.1
+batch_size = 180
+epochs = 20
+use_rate = 1
 valid_rate=0.25
 test_rate =0.25
 use_old_model= False # load model from file
@@ -52,14 +52,19 @@ use_old_model= False # load model from file
 #engine = "fair" 
 engine ="fair"
 binary =  "3D_Image_Toolkit"
+info_files=glob.glob("/home/xiaosatianyu/NAFL/test/3D_Image_Toolkit/nb-results/*.txt")  
 ignore_ts = 0   # if the number of samples for one class is smaller than it, ignore
-from_file = True # data infor from
-reduce_use_old = True
+from_file = False # data infor from
+reduce_use_old = False
+
+flag =False # 生成器
 
 if use_old_model==True:
     from_file=True
     reduce_use_old=True
 from keras.utils import Sequence
+
+
 
 class SequenceData(Sequence):
     def __init__(self,  batch_size, input_size, output_size, inputs_with_label, tag):
@@ -256,24 +261,28 @@ class Nmodel():
 
         l.info("training the modle")
         l.info("the steps is %d", len(self.train_sequence))
-        self.model.fit_generator( self.train_sequence.generator_batch_data(), 
+       
+        if flag:
+            l.info("using generator\n")
+            self.model.fit_generator( self.train_sequence.generator_batch_data(), 
                                   steps_per_epoch = len(self.train_sequence), 
                                   epochs = self.epochs, verbose=1,
-                                  max_queue_size=5, # 每次最多生成的批次i
+                                  #max_queue_size=5, # 每次最多生成的批次i
                                   #workers=1,         # 工作者的数量
                                   #use_multiprocessing=False,  # 是否启用多进程
                                   validation_data = self.test_sequence.generator_batch_data(),
                                   validation_steps = len(self.test_sequence) )
-        
-        self.model.fit_generator( self.train_sequence, 
-                                  steps_per_epoch = len(self.train_sequence), 
-                                  epochs = self.epochs, verbose=1,
-                                  #max_queue_size=10, # 每次最多生成的批次i
-                                  workers=5,         # 工作者的数量
-                                  use_multiprocessing=True,  # 是否启用多进程
-                                  validation_data = self.test_sequence,
-                                  validation_steps = len(self.test_sequence) )
-        #
+        else:
+            l.info("using multiprocess")
+            self.model.fit_generator( self.train_sequence, 
+                                      steps_per_epoch = len(self.train_sequence), 
+                                      epochs = self.epochs, verbose=1,
+                                      #max_queue_size=10, # 每次最多生成的批次i
+                                      workers=2,         # 工作者的数量
+                                      use_multiprocessing=True,  # 是否启用多进程
+                                      validation_data = self.test_sequence,
+                                      validation_steps = len(self.test_sequence) )
+            
         # save the model
         self.save_model()
     
@@ -417,7 +426,7 @@ def start():
 
     # 0.init the collect 
     collect = Collect( afl_work_dir = afl_work_dir, binary = binary, ignore_ts =ignore_ts, 
-                         from_file = from_file, engine = engine, reduce_use_old =reduce_use_old)
+                         from_file = from_file, engine = engine, reduce_use_old =reduce_use_old, info_files=info_files)
     #  collect the path of each input
     l.info("the ignore ts is %d", ignore_ts)
     l.info("begine to collect the data from %s", engine)
@@ -441,6 +450,7 @@ def start():
         input_size = max_input_size
     l.info("at last, use the input_size of %d\n", input_size)
     
+
     # init the model
     nmodel = Nmodel( input_size = input_size, output_size = output_size, binary=binary,
                     strides = strides, epochs = epochs, batch_size = batch_size ,

@@ -26,7 +26,7 @@ the default of trace bits if 0 for each byte
 '''
 
 class Collect():
-    def __init__(self, afl_work_dir, binary, ignore_ts, engine, from_file=False, reduce_use_old=False):
+    def __init__(self, afl_work_dir, binary, ignore_ts, engine, from_file=False, reduce_use_old=False, info_files=None):
         '''
         ignore_ts: ignore threshold, if the smaple number less than it, ignore
         '''
@@ -51,9 +51,16 @@ class Collect():
         # all inputs it is huge 
         self.all_inputs_with_label = list() #each element is a tuple, which is the inputs and bitmap paths
 
+        # get the branch infor
+        self.branch_info=dict()
+        self.info_files =info_files
+        self.read_branch_info()        
+
         # get the useful index from the total bitmap
         self.useful_index = None # it is should a sorted one %XX ; save the non -1 index of the total bitmap, meaning these index are used
         self._useful_index_from_total_bitmap()
+       
+
         
         self.reduce_tail = "-reduce"
         self.reduce_use_old = reduce_use_old
@@ -91,8 +98,9 @@ class Collect():
             check_content=f.read()
         
         # for check
+        temp_index = list(self.useful_index)
         for index in range(len(self.useful_index)):
-            if  check_content[index] == content[self.useful_index[index]]:
+            if  check_content[index] == content[ temp_index[index]]:
                 continue
             else:
                 l.info("there is some wrong")
@@ -179,15 +187,27 @@ class Collect():
 
         content = self.read_bitmap_content(self.total_bitmap_path)  #the return type is tuple 
 
-        #collect the usefull index
-        useful_index=list()
+        #collect the activated index
+        useful_index=set()
         for index in range( len(content) ):
             if not content[index] == 255:
-                useful_index.append(index)
+                useful_index.add(index)
+        l.info("%d activated index", len(useful_index))
+        # collect out the bilateral branches
+        copy_useful_index=useful_index.copy()
+        for index in copy_useful_index: 
+            if index in self.branch_info:
+                if not self.branch_info[index] in useful_index:
+                    useful_index.discard(index)
+                    l.info("In the Intresting %d is not a bilateral branch, remove it", index)
+                else:
+                    l.info("%d is a bilateral covered one",index)
+            else:
+                l.info("%d is activated but not in the branch info", index)
 
         #transform to tuple
-        self.useful_index = tuple(useful_index)
-        #l.info("usefull indes has %d length", len(self.useful_index))
+        self.useful_index = useful_index
+        l.info("usefull indes has %d length", len(self.useful_index))
     
     def get_useful_index(self):
         return self.useful_index
@@ -216,6 +236,26 @@ class Collect():
         with open(self.json_file_path, 'r') as outfile:
             self.all_inputs_with_label  = json.load( outfile )
         return True
+   
+    # get the branch info about the true and false
+    def read_branch_info(self):
+        for file in self.info_files:
+            f = open(file, "r")
+            for line in f:
+                line=line.strip()
+                result=line.split('|')
+                true_branch  = int(result[3])
+                false_branch = int(result[4] )
+                if true_branch in self.branch_info:
+                    l.warn("meeting reduandant branch at %d, for another, the record is %d, the new collect is %d", true_branch, self.branch_info[true_branch], false_branch)
+                else:
+                    self.branch_info[true_branch]=false_branch
+                if false_branch in self.branch_info:
+                    l.warn("meeting reduandant branch at %d, for another, the record is %d, the new collect is %d", false_branch, self.branch_info[false_branch], true_branch)
+                else:
+                    self.branch_info[false_branch]=true_branch
+            f.close()
+
 
 
 '''
@@ -268,9 +308,10 @@ class Path():
     def get_bitmap_path(self):
         return self.bitmap_path 
 
-
-
+        
 def main():
+    read_branch_info()
+    return
     engine="afl"
     l.info("using the data from %s", engine)
     
