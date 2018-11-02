@@ -27,4 +27,4 @@ fi
 rm -rf $OUTPUT
 mkdir -p $OUTPUT
 
-$AFL_HOME/afl-fuzz -i $PWD/seed -o $OUTPUT  $PWD/nb-results/$Target 
+$AFL_HOME/afl-fuzz -i $PWD/seed -o $OUTPUT  $PWD/$Target 

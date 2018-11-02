@@ -46,7 +46,7 @@ epochs = 20
 use_rate = 1
 valid_rate=0.25
 test_rate =0.25
-use_old_model= True # load model from file
+use_old_model= False # load model from file
 
 #for collect
 #engine = "fair" 
